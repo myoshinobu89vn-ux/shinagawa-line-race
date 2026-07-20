@@ -1,0 +1,36 @@
+name: Update timetable data
+
+on:
+  schedule:
+    # Monthly safety-net run. JR's dia revision is normally mid-March, so
+    # trigger this manually (Actions tab -> Run workflow) around then too.
+    - cron: "17 18 1 * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Rebuild timetable data from JR East
+        run: node scripts/build-timetable.js
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet -- data/timetable.json; then
+            echo "No timetable changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/timetable.json
+          git commit -m "Update timetable data ($(date -u +%Y-%m-%d))"
+          git push
