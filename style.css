@@ -259,14 +259,15 @@ body {
 
 .card-times {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .time-block {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .time-label {
@@ -282,8 +283,8 @@ body {
 
 .arrow {
   color: var(--text-dim);
-  font-size: 14px;
-  padding-top: 12px;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 .card-sub {
