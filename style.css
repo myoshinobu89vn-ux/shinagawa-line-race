@@ -50,35 +50,41 @@ body {
   font-size: 14px;
 }
 
-.direction-row {
+.station-row {
   display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.direction-toggle {
-  display: flex;
-  width: 100%;
-  background: var(--bg-elevated);
-  border-radius: 999px;
-  padding: 4px;
-  gap: 4px;
-}
-
-.direction-toggle button {
+.station-select {
   flex: 1;
-  border: none;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 7px 12px;
+  min-width: 0;
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-radius: 999px;
-  cursor: pointer;
+  padding: 9px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
 }
 
-.direction-toggle button.active {
+.swap-btn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
   background: var(--card-bg);
   color: var(--text);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .clock-row {

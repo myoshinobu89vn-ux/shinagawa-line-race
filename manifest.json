@@ -1,7 +1,7 @@
 {
-  "name": "品川→川崎 先着チェッカー",
-  "short_name": "品川→川崎",
-  "description": "品川駅で京浜東北線と東海道線、川崎に先に着くのはどっちかをリアルタイムに判定します。",
+  "name": "京浜東北線 vs 東海道線 先着チェッカー",
+  "short_name": "京浜東北vs東海道",
+  "description": "京浜東北線と東海道線、選んだ駅にどっちが先に着くかをリアルタイムに判定します。",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

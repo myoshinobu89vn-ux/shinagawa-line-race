@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>品川→川崎 先着チェッカー</title>
-<meta name="description" content="品川駅で京浜東北線と東海道線、川崎に先に着くのはどっち？をリアルタイムに判定します。">
+<title>京浜東北線 vs 東海道線 先着チェッカー</title>
+<meta name="description" content="京浜東北線と東海道線、選んだ駅にどっちが先に着くかをリアルタイムに判定します。">
 <meta name="theme-color" content="#0b1f3a">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="品川→川崎">
+<meta name="apple-mobile-web-app-title" content="京浜東北vs東海道">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -21,11 +21,10 @@
     <p class="subtitle" id="routeTitle">品川 &rarr; 川崎</p>
   </header>
 
-  <section class="direction-row">
-    <div class="direction-toggle" id="directionToggle">
-      <button data-direction="toKawasaki" class="active">品川→川崎</button>
-      <button data-direction="toShinagawa">川崎→品川</button>
-    </div>
+  <section class="station-row">
+    <select id="fromSelect" class="station-select" aria-label="出発駅"></select>
+    <button id="swapStations" class="swap-btn" aria-label="出発駅と到着駅を入れ替え">⇄</button>
+    <select id="toSelect" class="station-select" aria-label="到着駅"></select>
   </section>
 
   <section class="clock-row">
