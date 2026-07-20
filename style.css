@@ -219,8 +219,9 @@ body {
 
 .card-title {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-dim);
@@ -228,18 +229,23 @@ body {
   min-width: 0;
 }
 
+.card-title-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .badge-dest {
-  margin-left: auto;
+  max-width: 100%;
   font-size: 11px;
   color: var(--text-dim);
   background: rgba(255, 255, 255, 0.06);
   padding: 2px 6px;
   border-radius: 999px;
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex-shrink: 1;
 }
 
 .line-dot {
