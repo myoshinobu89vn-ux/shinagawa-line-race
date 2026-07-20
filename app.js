@@ -81,8 +81,8 @@ function render() {
   const keihinList = dirData.keihinTohoku[dayType];
   const tokaidoList = dirData.tokaido[dayType];
 
-  const keihinNext = findNextTrains(keihinList, earliest, 3);
-  const tokaidoNext = findNextTrains(tokaidoList, earliest, 3);
+  const keihinNext = findNextTrains(keihinList, earliest, 4);
+  const tokaidoNext = findNextTrains(tokaidoList, earliest, 4);
 
   renderLine("keihin", direction, "keihinTohoku", keihinNext);
   renderLine("tokaido", direction, "tokaido", tokaidoNext);

@@ -32,16 +32,16 @@ body {
 .app {
   max-width: 480px;
   margin: 0 auto;
-  padding: 20px 16px 40px;
+  padding: 12px 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
 }
 
 .app-header h1 {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1.3;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
 }
 
 .subtitle {
@@ -70,7 +70,7 @@ body {
   color: var(--text-dim);
   font-size: 14px;
   font-weight: 600;
-  padding: 10px 12px;
+  padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -90,7 +90,7 @@ body {
 
 .clock {
   font-variant-numeric: tabular-nums;
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -121,7 +121,7 @@ body {
 .buffer-row {
   background: var(--bg-elevated);
   border-radius: var(--radius);
-  padding: 12px 14px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -141,8 +141,8 @@ body {
 }
 
 .stepper {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: none;
   background: var(--card-bg);
@@ -165,14 +165,14 @@ body {
 }
 
 .result {
-  min-height: 76px;
+  min-height: 56px;
 }
 
 .result-banner {
   background: var(--bg-elevated);
   border-radius: var(--radius);
-  padding: 18px 16px;
-  font-size: 18px;
+  padding: 12px 16px;
+  font-size: 17px;
   font-weight: 700;
   text-align: center;
   line-height: 1.4;
@@ -207,7 +207,7 @@ body {
   min-width: 0;
   background: var(--card-bg);
   border-radius: var(--radius);
-  padding: 14px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   transition: transform 0.15s ease;
 }
@@ -221,11 +221,11 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 3px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-dim);
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   min-width: 0;
 }
 
@@ -294,16 +294,16 @@ body {
 }
 
 .card-sub {
-  margin-top: 8px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--text-dim);
   min-height: 14px;
 }
 
 .upcoming h2 {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-dim);
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   font-weight: 600;
 }
 
@@ -319,7 +319,7 @@ body {
   gap: 6px;
   font-size: 12px;
   color: var(--text-dim);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .upcoming-col ul {
@@ -328,13 +328,13 @@ body {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .upcoming-col li {
   background: var(--bg-elevated);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   display: flex;
@@ -346,10 +346,10 @@ body {
 }
 
 .app-footer {
-  margin-top: 8px;
+  margin-top: 2px;
   color: var(--text-dim);
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .app-footer a {
