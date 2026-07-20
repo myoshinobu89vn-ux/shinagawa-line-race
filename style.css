@@ -49,6 +49,37 @@ body {
   font-size: 14px;
 }
 
+.direction-row {
+  display: flex;
+}
+
+.direction-toggle {
+  display: flex;
+  width: 100%;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.direction-toggle button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.direction-toggle button.active {
+  background: var(--card-bg);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
 .clock-row {
   display: flex;
   align-items: center;

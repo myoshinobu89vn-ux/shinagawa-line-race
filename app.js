@@ -1,10 +1,17 @@
 const DEST_LABEL = {
-  keihinTohoku: { "無印": "大船", "磯": "磯子", "桜": "桜木町", "鶴": "鶴見", "神": "東神奈川" },
-  tokaido: { "無印": "熱海", "小": "小田原", "平": "平塚", "国": "国府津", "下": "伊豆急下田", "伊": "伊東", "沼": "沼津", "修": "修善寺" },
+  toKawasaki: {
+    keihinTohoku: { "無印": "大船", "磯": "磯子", "桜": "桜木町", "鶴": "鶴見", "神": "東神奈川" },
+    tokaido: { "無印": "熱海", "小": "小田原", "平": "平塚", "国": "国府津", "下": "伊豆急下田", "伊": "伊東", "沼": "沼津", "修": "修善寺" },
+  },
+  toShinagawa: {
+    keihinTohoku: { "無印": "大宮", "浦": "南浦和", "赤": "赤羽", "上": "上野" },
+    tokaido: { "無印": "高崎", "宇": "宇都宮", "金": "小金井", "籠": "籠原", "東": "東京", "上": "上野", "古": "古河", "品": "品川", "前": "前橋" },
+  },
 };
 
 const STORAGE_KEY_BUFFER = "skr_buffer_minutes";
 const STORAGE_KEY_DAYTYPE = "skr_daytype_mode";
+const STORAGE_KEY_DIRECTION = "skr_direction";
 
 let dataset = null;
 
@@ -37,6 +44,10 @@ function resolveDayType(mode, dayOfWeek) {
   return dayOfWeek === 0 || dayOfWeek === 6 ? "weekend" : "weekday";
 }
 
+function currentDirection() {
+  return document.querySelector(".direction-toggle button.active").dataset.direction;
+}
+
 // Finds the next N trains at or after `earliestMin`. Dataset entries carry
 // depMinTotal that can exceed 1440 for the post-midnight tail of the service
 // day, so if it's currently the small hours (before first train), we shift
@@ -58,20 +69,23 @@ function render() {
   const now = nowInfo();
   el("clock").textContent = `${pad2(now.date.getHours())}:${pad2(now.date.getMinutes())}:${pad2(now.date.getSeconds())}`;
 
+  const direction = currentDirection();
+  const dirData = dataset[direction];
+
   const mode = document.querySelector(".daytype-toggle button.active").dataset.mode;
   const dayType = resolveDayType(mode, now.dayOfWeek);
 
   const bufferMin = Math.max(0, parseInt(el("bufferInput").value, 10) || 0);
   const earliest = now.minTotal + bufferMin;
 
-  const keihinList = dataset.keihinTohoku[dayType];
-  const tokaidoList = dataset.tokaido[dayType];
+  const keihinList = dirData.keihinTohoku[dayType];
+  const tokaidoList = dirData.tokaido[dayType];
 
   const keihinNext = findNextTrains(keihinList, earliest, 3);
   const tokaidoNext = findNextTrains(tokaidoList, earliest, 3);
 
-  renderLine("keihin", "keihinTohoku", keihinNext);
-  renderLine("tokaido", "tokaido", tokaidoNext);
+  renderLine("keihin", direction, "keihinTohoku", keihinNext);
+  renderLine("tokaido", direction, "tokaido", tokaidoNext);
 
   const banner = el("resultBanner");
   const cardKeihin = el("cardKeihin");
@@ -79,6 +93,8 @@ function render() {
   cardKeihin.classList.remove("winner");
   cardTokaido.classList.remove("winner");
   banner.classList.remove("win-keihin", "win-tokaido");
+
+  const toStation = dirData.toStation;
 
   if (keihinNext.length === 0 && tokaidoNext.length === 0) {
     banner.innerHTML = "本日の運行は終了しました";
@@ -95,20 +111,20 @@ function render() {
     const t = tokaidoNext[0];
     const diff = k.arrMinTotal - t.arrMinTotal;
     if (diff === 0) {
-      banner.innerHTML = "川崎に同時着です";
+      banner.innerHTML = `${toStation}に同時着です`;
     } else if (diff > 0) {
-      banner.innerHTML = `東海道線が ${diff}分早く 川崎に到着<span class="diff">京浜東北線 ${formatHM(k.arrMinTotal)}着 / 東海道線 ${formatHM(t.arrMinTotal)}着</span>`;
+      banner.innerHTML = `東海道線が ${diff}分早く ${toStation}に到着<span class="diff">京浜東北線 ${formatHM(k.arrMinTotal)}着 / 東海道線 ${formatHM(t.arrMinTotal)}着</span>`;
       cardTokaido.classList.add("winner");
       banner.classList.add("win-tokaido");
     } else {
-      banner.innerHTML = `京浜東北線が ${-diff}分早く 川崎に到着<span class="diff">京浜東北線 ${formatHM(k.arrMinTotal)}着 / 東海道線 ${formatHM(t.arrMinTotal)}着</span>`;
+      banner.innerHTML = `京浜東北線が ${-diff}分早く ${toStation}に到着<span class="diff">京浜東北線 ${formatHM(k.arrMinTotal)}着 / 東海道線 ${formatHM(t.arrMinTotal)}着</span>`;
       cardKeihin.classList.add("winner");
       banner.classList.add("win-keihin");
     }
   }
 }
 
-function renderLine(prefix, lineKey, nextTrains) {
+function renderLine(prefix, direction, lineKey, nextTrains) {
   const depEl = el(`${prefix}Dep`);
   const arrEl = el(`${prefix}Arr`);
   const destEl = el(`${prefix}Dest`);
@@ -124,10 +140,11 @@ function renderLine(prefix, lineKey, nextTrains) {
     return;
   }
 
+  const labels = DEST_LABEL[direction][lineKey];
   const first = nextTrains[0];
   depEl.textContent = formatHM(first.depMinTotal);
   arrEl.textContent = formatHM(first.arrMinTotal);
-  destEl.textContent = DEST_LABEL[lineKey][first.dest] ? `${DEST_LABEL[lineKey][first.dest]}行` : "";
+  destEl.textContent = labels[first.dest] ? `${labels[first.dest]}行` : "";
   subEl.textContent = "";
 
   upcomingEl.innerHTML = nextTrains
@@ -137,6 +154,35 @@ function renderLine(prefix, lineKey, nextTrains) {
         `<li><span class="dep">${formatHM(t.depMinTotal)}発</span><span class="arr">${formatHM(t.arrMinTotal)}着</span></li>`
     )
     .join("");
+}
+
+function updateStationLabels() {
+  const direction = currentDirection();
+  const dirData = dataset ? dataset[direction] : null;
+  const fromStation = dirData ? dirData.fromStation : direction === "toKawasaki" ? "品川" : "川崎";
+  const toStation = dirData ? dirData.toStation : direction === "toKawasaki" ? "川崎" : "品川";
+  el("routeTitle").textContent = `${fromStation} → ${toStation}`;
+  el("keihinDepLabel").textContent = `${fromStation}発`;
+  el("keihinArrLabel").textContent = `${toStation}着`;
+  el("tokaidoDepLabel").textContent = `${fromStation}発`;
+  el("tokaidoArrLabel").textContent = `${toStation}着`;
+}
+
+function setupDirectionToggle() {
+  const container = el("directionToggle");
+  const saved = localStorage.getItem(STORAGE_KEY_DIRECTION) || "toKawasaki";
+  container.querySelectorAll("button").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.direction === saved);
+  });
+  container.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      container.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      localStorage.setItem(STORAGE_KEY_DIRECTION, btn.dataset.direction);
+      updateStationLabels();
+      render();
+    });
+  });
 }
 
 function setupDaytypeToggle() {
@@ -179,12 +225,15 @@ function setupBufferInput() {
 }
 
 async function init() {
+  setupDirectionToggle();
   setupDaytypeToggle();
   setupBufferInput();
+  updateStationLabels();
 
   try {
     const res = await fetch("data/timetable.json");
     dataset = await res.json();
+    updateStationLabels();
     const genDate = new Date(dataset.generatedAt);
     el("datasetNote").textContent = `時刻表データ取得日: ${genDate.getFullYear()}/${genDate.getMonth() + 1}/${genDate.getDate()}`;
   } catch (e) {

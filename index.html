@@ -17,9 +17,16 @@
 <body>
 <div class="app">
   <header class="app-header">
-    <h1>品川 &rarr; 川崎<br>どっちが先着？</h1>
-    <p class="subtitle">京浜東北線 vs 東海道線</p>
+    <h1 id="routeTitle">品川 &rarr; 川崎</h1>
+    <p class="subtitle">京浜東北線 vs 東海道線、どっちが先着？</p>
   </header>
+
+  <section class="direction-row">
+    <div class="direction-toggle" id="directionToggle">
+      <button data-direction="toKawasaki" class="active">品川→川崎</button>
+      <button data-direction="toShinagawa">川崎→品川</button>
+    </div>
+  </section>
 
   <section class="clock-row">
     <div class="clock" id="clock">--:--:--</div>
@@ -52,12 +59,12 @@
       </div>
       <div class="card-times">
         <div class="time-block">
-          <span class="time-label">品川発</span>
+          <span class="time-label" id="keihinDepLabel">品川発</span>
           <span class="time-value" id="keihinDep">--:--</span>
         </div>
         <div class="arrow">→</div>
         <div class="time-block">
-          <span class="time-label">川崎着</span>
+          <span class="time-label" id="keihinArrLabel">川崎着</span>
           <span class="time-value" id="keihinArr">--:--</span>
         </div>
       </div>
@@ -72,12 +79,12 @@
       </div>
       <div class="card-times">
         <div class="time-block">
-          <span class="time-label">品川発</span>
+          <span class="time-label" id="tokaidoDepLabel">品川発</span>
           <span class="time-value" id="tokaidoDep">--:--</span>
         </div>
         <div class="arrow">→</div>
         <div class="time-block">
-          <span class="time-label">川崎着</span>
+          <span class="time-label" id="tokaidoArrLabel">川崎着</span>
           <span class="time-value" id="tokaidoArr">--:--</span>
         </div>
       </div>
