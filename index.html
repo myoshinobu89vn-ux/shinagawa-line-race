@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>品川→川崎 先着チェッカー</title>
+<meta name="description" content="品川駅で京浜東北線と東海道線、川崎に先に着くのはどっち？をリアルタイムに判定します。">
+<meta name="theme-color" content="#0b1f3a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="品川→川崎">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="app-header">
+    <h1>品川 &rarr; 川崎<br>どっちが先着？</h1>
+    <p class="subtitle">京浜東北線 vs 東海道線</p>
+  </header>
+
+  <section class="clock-row">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="daytype-toggle" id="daytypeToggle">
+      <button data-mode="auto" class="active">自動</button>
+      <button data-mode="weekday">平日</button>
+      <button data-mode="weekend">土休日</button>
+    </div>
+  </section>
+
+  <section class="buffer-row">
+    <label for="bufferInput">乗り換え・待ち時間の余裕（分）</label>
+    <div class="buffer-input-wrap">
+      <button id="bufferMinus" class="stepper">−</button>
+      <input type="number" id="bufferInput" min="0" max="15" value="2">
+      <button id="bufferPlus" class="stepper">＋</button>
+    </div>
+  </section>
+
+  <section id="result" class="result">
+    <div class="result-banner" id="resultBanner">読み込み中…</div>
+  </section>
+
+  <section class="cards">
+    <div class="card" id="cardKeihin">
+      <div class="card-title">
+        <span class="line-dot keihin"></span>
+        京浜東北線
+        <span class="badge-dest" id="keihinDest"></span>
+      </div>
+      <div class="card-times">
+        <div class="time-block">
+          <span class="time-label">品川発</span>
+          <span class="time-value" id="keihinDep">--:--</span>
+        </div>
+        <div class="arrow">→</div>
+        <div class="time-block">
+          <span class="time-label">川崎着</span>
+          <span class="time-value" id="keihinArr">--:--</span>
+        </div>
+      </div>
+      <div class="card-sub" id="keihinSub"></div>
+    </div>
+
+    <div class="card" id="cardTokaido">
+      <div class="card-title">
+        <span class="line-dot tokaido"></span>
+        東海道線
+        <span class="badge-dest" id="tokaidoDest"></span>
+      </div>
+      <div class="card-times">
+        <div class="time-block">
+          <span class="time-label">品川発</span>
+          <span class="time-value" id="tokaidoDep">--:--</span>
+        </div>
+        <div class="arrow">→</div>
+        <div class="time-block">
+          <span class="time-label">川崎着</span>
+          <span class="time-value" id="tokaidoArr">--:--</span>
+        </div>
+      </div>
+      <div class="card-sub" id="tokaidoSub"></div>
+    </div>
+  </section>
+
+  <section class="upcoming">
+    <h2>この後の便</h2>
+    <div class="upcoming-cols">
+      <div class="upcoming-col">
+        <div class="upcoming-col-title"><span class="line-dot keihin"></span>京浜東北線</div>
+        <ul id="keihinUpcoming"></ul>
+      </div>
+      <div class="upcoming-col">
+        <div class="upcoming-col-title"><span class="line-dot tokaido"></span>東海道線</div>
+        <ul id="tokaidoUpcoming"></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="app-footer">
+    <p id="datasetNote"></p>
+    <p class="disclaimer">
+      時刻は品川駅の公式時刻表（<a href="https://timetables.jreast.co.jp/" target="_blank" rel="noopener">JR東日本</a>）を基にした静的データです。
+      実際の運行は遅延・ダイヤ改正等で変わるため、参考情報としてご利用ください。
+    </p>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

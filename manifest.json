@@ -1,0 +1,17 @@
+{
+  "name": "品川→川崎 先着チェッカー",
+  "short_name": "品川→川崎",
+  "description": "品川駅で京浜東北線と東海道線、川崎に先に着くのはどっちかをリアルタイムに判定します。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1f3a",
+  "theme_color": "#0b1f3a",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
