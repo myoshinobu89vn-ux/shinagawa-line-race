@@ -3,6 +3,12 @@ const STORAGE_KEY_DAYTYPE = "skr_daytype_mode";
 const STORAGE_KEY_FROM = "skr_from_station";
 const STORAGE_KEY_TO = "skr_to_station";
 
+const LINES = [
+  { key: "keihinTohoku", label: "京浜東北線", colorClass: "keihin" },
+  { key: "tokaido", label: "東海道線", colorClass: "tokaido" },
+  { key: "keikyu", label: "京急線", colorClass: "keikyu" },
+];
+
 let dataset = null;
 
 const el = (id) => document.getElementById(id);
@@ -42,6 +48,12 @@ function direction(from, to) {
   return dataset.stations.indexOf(to) > dataset.stations.indexOf(from) ? "south" : "north";
 }
 
+// Which of LINES actually run between the current from/to (Keikyu only
+// covers the shinagawa/kawasaki/yokohama overlap, so it drops out otherwise).
+function activeLines(from, to, dir) {
+  return LINES.filter((line) => dataset.lines[line.key]?.[dir]?.[from]);
+}
+
 // Finds the next N trains (that actually reach `to`) at or after
 // `earliestSeconds`. Trains depart at second :00 of their listed minute, so
 // this compares in seconds rather than minutes — otherwise a train scheduled
@@ -70,6 +82,8 @@ function render() {
 
   const { from, to } = currentFromTo();
   const dir = direction(from, to);
+  const lines = activeLines(from, to, dir);
+  renderCards(lines);
 
   const mode = document.querySelector(".daytype-toggle button.active").dataset.mode;
   const dayType = resolveDayType(mode, now.dayOfWeek);
@@ -77,58 +91,95 @@ function render() {
   const bufferMin = parseInt(el("bufferInput").value, 10) || 0;
   const earliest = now.totalSeconds + bufferMin * 60;
 
-  const keihinList = (dataset.lines.keihinTohoku[dir][from] || {})[dayType] || [];
-  const tokaidoList = (dataset.lines.tokaido[dir][from] || {})[dayType] || [];
-
-  const keihinNext = findNextTrains(keihinList, to, earliest, 4);
-  const tokaidoNext = findNextTrains(tokaidoList, to, earliest, 4);
-
-  renderLine("keihin", to, keihinNext);
-  renderLine("tokaido", to, tokaidoNext);
+  const toLabel = dataset.stationLabels[to];
+  const results = lines.map((line) => {
+    const list = (dataset.lines[line.key][dir][from] || {})[dayType] || [];
+    const next = findNextTrains(list, to, earliest, 4);
+    renderLine(line.key, to, next);
+    return { line, next };
+  });
 
   const banner = el("resultBanner");
-  const cardKeihin = el("cardKeihin");
-  const cardTokaido = el("cardTokaido");
-  cardKeihin.classList.remove("winner");
-  cardTokaido.classList.remove("winner");
-  banner.classList.remove("win-keihin", "win-tokaido");
+  for (const { line } of results) el(`card-${line.key}`).classList.remove("winner");
+  banner.className = "result-banner";
 
-  const toLabel = dataset.stationLabels[to];
-
-  if (keihinNext.length === 0 && tokaidoNext.length === 0) {
+  const running = results.filter((r) => r.next.length > 0);
+  if (running.length === 0) {
     banner.innerHTML = "本日の運行は終了しました";
-  } else if (keihinNext.length === 0) {
-    banner.innerHTML = "東海道線のみ運行中";
-    cardTokaido.classList.add("winner");
-    banner.classList.add("win-tokaido");
-  } else if (tokaidoNext.length === 0) {
-    banner.innerHTML = "京浜東北線のみ運行中";
-    cardKeihin.classList.add("winner");
-    banner.classList.add("win-keihin");
+  } else if (running.length < results.length) {
+    const names = running.map((r) => r.line.label).join("・");
+    banner.innerHTML = `${names}のみ運行中`;
+    for (const r of running) {
+      el(`card-${r.line.key}`).classList.add("winner");
+      banner.classList.add(`win-${r.line.colorClass}`);
+    }
   } else {
-    const k = keihinNext[0];
-    const t = tokaidoNext[0];
-    const diff = k.arrivals[to] - t.arrivals[to];
-    if (diff === 0) {
-      banner.innerHTML = `${toLabel}に同時着です`;
-    } else if (diff > 0) {
-      banner.innerHTML = `東海道線が ${diff}分早く ${toLabel}に到着<span class="diff">京浜東北線 ${formatHM(k.arrivals[to])}着 / 東海道線 ${formatHM(t.arrivals[to])}着</span>`;
-      cardTokaido.classList.add("winner");
-      banner.classList.add("win-tokaido");
+    const bestTime = Math.min(...running.map((r) => r.next[0].arrivals[to]));
+    const winners = running.filter((r) => r.next[0].arrivals[to] === bestTime);
+    const detail = running
+      .map((r) => `${r.line.label} ${formatHM(r.next[0].arrivals[to])}着`)
+      .join(" / ");
+    if (winners.length > 1) {
+      banner.innerHTML = `${toLabel}に同時着です<span class="diff">${detail}</span>`;
     } else {
-      banner.innerHTML = `京浜東北線が ${-diff}分早く ${toLabel}に到着<span class="diff">京浜東北線 ${formatHM(k.arrivals[to])}着 / 東海道線 ${formatHM(t.arrivals[to])}着</span>`;
-      cardKeihin.classList.add("winner");
-      banner.classList.add("win-keihin");
+      const winner = winners[0];
+      const runnerUpTime = Math.min(
+        ...running.filter((r) => r !== winner).map((r) => r.next[0].arrivals[to])
+      );
+      const diff = runnerUpTime - bestTime;
+      banner.innerHTML = `${winner.line.label}が ${diff}分早く ${toLabel}に到着<span class="diff">${detail}</span>`;
+    }
+    for (const w of winners) {
+      el(`card-${w.line.key}`).classList.add("winner");
+      banner.classList.add(`win-${w.line.colorClass}`);
     }
   }
 }
 
-function renderLine(prefix, to, nextTrains) {
-  const depEl = el(`${prefix}Dep`);
-  const arrEl = el(`${prefix}Arr`);
-  const destEl = el(`${prefix}Dest`);
-  const subEl = el(`${prefix}Sub`);
-  const upcomingEl = el(`${prefix}Upcoming`);
+function renderCards(lines) {
+  const container = el("cardsContainer");
+  const upcoming = el("upcomingContainer");
+  container.className = `cards cols-${lines.length}`;
+  container.innerHTML = lines
+    .map(
+      (line) => `
+    <div class="card" id="card-${line.key}">
+      <div class="card-title">
+        <div class="card-title-name"><span class="line-dot ${line.colorClass}"></span>${line.label}</div>
+        <span class="badge-dest" id="${line.key}Dest"></span>
+      </div>
+      <div class="card-times">
+        <div class="time-block">
+          <span class="time-label" id="${line.key}DepLabel"></span>
+          <span class="time-value" id="${line.key}Dep">--:--</span>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="time-block">
+          <span class="time-label" id="${line.key}ArrLabel"></span>
+          <span class="time-value" id="${line.key}Arr">--:--</span>
+        </div>
+      </div>
+      <div class="card-sub" id="${line.key}Sub"></div>
+    </div>`
+    )
+    .join("");
+  upcoming.innerHTML = lines
+    .map(
+      (line) => `
+    <div class="upcoming-col">
+      <div class="upcoming-col-title"><span class="line-dot ${line.colorClass}"></span>${line.label}</div>
+      <ul id="${line.key}Upcoming"></ul>
+    </div>`
+    )
+    .join("");
+}
+
+function renderLine(lineKey, to, nextTrains) {
+  const depEl = el(`${lineKey}Dep`);
+  const arrEl = el(`${lineKey}Arr`);
+  const destEl = el(`${lineKey}Dest`);
+  const subEl = el(`${lineKey}Sub`);
+  const upcomingEl = el(`${lineKey}Upcoming`);
 
   if (nextTrains.length === 0) {
     depEl.textContent = "--:--";
@@ -159,10 +210,12 @@ function updateStationLabels() {
   const fromLabel = dataset ? dataset.stationLabels[from] : from;
   const toLabel = dataset ? dataset.stationLabels[to] : to;
   el("routeTitle").textContent = `${fromLabel} → ${toLabel}`;
-  el("keihinDepLabel").textContent = `${fromLabel}発`;
-  el("keihinArrLabel").textContent = `${toLabel}着`;
-  el("tokaidoDepLabel").textContent = `${fromLabel}発`;
-  el("tokaidoArrLabel").textContent = `${toLabel}着`;
+  for (const line of LINES) {
+    const depLabelEl = el(`${line.key}DepLabel`);
+    const arrLabelEl = el(`${line.key}ArrLabel`);
+    if (depLabelEl) depLabelEl.textContent = `${fromLabel}発`;
+    if (arrLabelEl) arrLabelEl.textContent = `${toLabel}着`;
+  }
 }
 
 function populateStationSelects() {

@@ -49,70 +49,17 @@
     <div class="result-banner" id="resultBanner">読み込み中…</div>
   </section>
 
-  <section class="cards">
-    <div class="card" id="cardKeihin">
-      <div class="card-title">
-        <div class="card-title-name">
-          <span class="line-dot keihin"></span>
-          京浜東北線
-        </div>
-        <span class="badge-dest" id="keihinDest"></span>
-      </div>
-      <div class="card-times">
-        <div class="time-block">
-          <span class="time-label" id="keihinDepLabel">品川発</span>
-          <span class="time-value" id="keihinDep">--:--</span>
-        </div>
-        <div class="arrow">↓</div>
-        <div class="time-block">
-          <span class="time-label" id="keihinArrLabel">川崎着</span>
-          <span class="time-value" id="keihinArr">--:--</span>
-        </div>
-      </div>
-      <div class="card-sub" id="keihinSub"></div>
-    </div>
-
-    <div class="card" id="cardTokaido">
-      <div class="card-title">
-        <div class="card-title-name">
-          <span class="line-dot tokaido"></span>
-          東海道線
-        </div>
-        <span class="badge-dest" id="tokaidoDest"></span>
-      </div>
-      <div class="card-times">
-        <div class="time-block">
-          <span class="time-label" id="tokaidoDepLabel">品川発</span>
-          <span class="time-value" id="tokaidoDep">--:--</span>
-        </div>
-        <div class="arrow">↓</div>
-        <div class="time-block">
-          <span class="time-label" id="tokaidoArrLabel">川崎着</span>
-          <span class="time-value" id="tokaidoArr">--:--</span>
-        </div>
-      </div>
-      <div class="card-sub" id="tokaidoSub"></div>
-    </div>
-  </section>
+  <section class="cards" id="cardsContainer"></section>
 
   <section class="upcoming">
     <h2>この後の便</h2>
-    <div class="upcoming-cols">
-      <div class="upcoming-col">
-        <div class="upcoming-col-title"><span class="line-dot keihin"></span>京浜東北線</div>
-        <ul id="keihinUpcoming"></ul>
-      </div>
-      <div class="upcoming-col">
-        <div class="upcoming-col-title"><span class="line-dot tokaido"></span>東海道線</div>
-        <ul id="tokaidoUpcoming"></ul>
-      </div>
-    </div>
+    <div class="upcoming-cols" id="upcomingContainer"></div>
   </section>
 
   <footer class="app-footer">
     <p id="datasetNote"></p>
     <p class="disclaimer">
-      時刻は品川駅の公式時刻表（<a href="https://timetables.jreast.co.jp/" target="_blank" rel="noopener">JR東日本</a>）を基にした静的データです。
+      時刻はJR東日本公式時刻表（<a href="https://timetables.jreast.co.jp/" target="_blank" rel="noopener">timetables.jreast.co.jp</a>）および京急電鉄の時刻表（<a href="https://ekitan.com/" target="_blank" rel="noopener">駅探</a>経由）を基にした静的データです。
       実際の運行は遅延・ダイヤ改正等で変わるため、参考情報としてご利用ください。
     </p>
   </footer>

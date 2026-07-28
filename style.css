@@ -6,6 +6,7 @@
   --text-dim: #9fb3d1;
   --keihin: #00b2e5;
   --tokaido: #f68b1e;
+  --keikyu: #e2445c;
   --win: #33d17a;
   --border: rgba(255, 255, 255, 0.08);
   --radius: 16px;
@@ -195,6 +196,11 @@ body {
   box-shadow: 0 0 0 1px var(--tokaido) inset;
 }
 
+.result-banner.win-keikyu {
+  border-color: var(--keikyu);
+  box-shadow: 0 0 0 1px var(--keikyu) inset;
+}
+
 .result-banner .diff {
   display: block;
   font-size: 13px;
@@ -205,8 +211,27 @@ body {
 
 .cards {
   display: grid;
+  gap: 10px;
+}
+
+.cards.cols-2 {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+}
+
+.cards.cols-3 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.cards.cols-3 .card {
+  padding: 8px 8px;
+}
+
+.cards.cols-3 .time-value {
+  font-size: 16px;
+}
+
+.cards.cols-3 .card-title {
+  font-size: 12px;
 }
 
 .card {
@@ -269,6 +294,10 @@ body {
   background: var(--tokaido);
 }
 
+.line-dot.keikyu {
+  background: var(--keikyu);
+}
+
 .card-times {
   display: flex;
   flex-direction: column;
@@ -315,8 +344,9 @@ body {
 
 .upcoming-cols {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .upcoming-col-title {

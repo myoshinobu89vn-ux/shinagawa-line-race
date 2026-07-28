@@ -56,12 +56,34 @@ const DEST_REACH = {
     south: { "無印": 3, "熱": 99, "小": 99, "平": 99, "国": 99, "下": 99, "伊": 99, "沼": 99, "修": 99, "出": 99, "高": 99, "琴": 99 },
     north: { "品": 3, "東": 1, "無印": -99, "宇": -99, "金": -99, "籠": -99, "上": 0, "古": -99, "前": -99 },
   },
+  // Keikyu only overlaps our shared-station set at shinagawa(3)/kawasaki(4)/
+  // yokohama(5), so only destinations that fall short of one of those need an
+  // entry — everything else (through-service into Toei Asakusa/Keisei to the
+  // north, or Uraga/Miura Peninsula to the south) reaches all three.
+  keikyu: {
+    south: { "羽田空港第１・第２ターミナル": 3.5, "京急川崎": 4, "神奈川新町": 4.5 },
+    north: { "羽田空港第１・第２ターミナル": 4, "京急川崎": 4, "神奈川新町": 4.5, "品川": 3 },
+  },
 };
 
-function get(url) {
+// Keikyu (a separate private railway, not JR) publishes timetables through a
+// stateful session-based mobile site that plain HTTP requests can't drive, so
+// this uses ekitan.com's mirror instead — which is what Keikyu's own official
+// site links out to for exactly this data. A mobile Safari UA is required:
+// with a generic UA the server returns only the currently-active direction's
+// tab and ignores the requested direction/date, silently serving the wrong
+// data — verified by diffing responses across UAs before relying on this.
+const KEIKYU_SLCODE = { shinagawa: "250-1", kawasaki: "250-14", yokohama: "250-25" };
+const KEIKYU_STATION_LABELS = { shinagawa: "品川", kawasaki: "京急川崎", yokohama: "横浜" };
+const KEIKYU_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15";
+// ekitan's own dir=1/dir=2 encode "泉岳寺方面" (toward Tokyo, our "north") and
+// "浦賀方面" (toward Yokohama/Uraga, our "south") respectively.
+const KEIKYU_DIR_TO_EKITAN = { south: "2", north: "1" };
+
+function get(url, userAgent) {
   return new Promise((resolve, reject) => {
     https
-      .get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
+      .get(url, { headers: { "User-Agent": userAgent || "Mozilla/5.0" } }, (res) => {
         if (res.statusCode !== 200) {
           reject(new Error(`HTTP ${res.statusCode} for ${url}`));
           res.resume();
@@ -279,14 +301,151 @@ async function buildStationLineDirection(station, line, dir, prefix) {
   return { weekday: buildTrains(weekday), weekend: buildTrains(weekend) };
 }
 
+// A single ekitan page embeds both directions' full-day listing, split into
+// blocks anchored by id='section_{dir}_{hour}' (dir 1/2, hour "00".."23").
+function parseKeikyuSections(html) {
+  const anchorRe = /id=['"]section_(\d)_(\d{2})['"][^>]*data-hour="(\d{2})"/g;
+  const anchors = [...html.matchAll(anchorRe)];
+  const trains = [];
+  for (let i = 0; i < anchors.length; i++) {
+    const [, dir, hourStr] = anchors[i];
+    const start = anchors[i].index;
+    const end = i + 1 < anchors.length ? anchors[i + 1].index : html.length;
+    const chunk = html.slice(start, end);
+    let hour = parseInt(hourStr, 10);
+    if (hour === 0) hour = 24; // post-midnight tail, same convention as JR
+    const liRe = /data-tr-type="([^"]*)" data-dest="([^"]*)"[^>]*>\s*<a href="([^"]+)"/g;
+    for (const m of chunk.matchAll(liRe)) {
+      const [, trType, dest, href] = m;
+      const depMatch = href.match(/departure=(\d{2})(\d{2})/);
+      if (!depMatch) continue;
+      trains.push({ dir, hour, minute: parseInt(depMatch[2], 10), trType, dest, href });
+    }
+  }
+  return trains;
+}
+
+function extractKeikyuStopTimes(html) {
+  const re = /<td class="td-dep-and-arr-time">([\s\S]*?)<\/td>\s*<td class="td-station-name"><a[^>]*>([^<]+)<\/a>/g;
+  const times = {};
+  for (const m of html.matchAll(re)) {
+    const timeMatch = m[1].match(/(\d{1,2}:\d{2})/);
+    if (timeMatch) times[m[2]] = timeMatch[1];
+  }
+  return times;
+}
+
+// Unlike JR (one consistent speed per line, so travel time only really
+// varies with rush-hour dwell), Keikyu mixes 普通/特急/快特 with genuinely
+// different stopping patterns on the very same route. Calibrating "per hour"
+// as with JR would silently mix a slow 普通's time with a fast 快特's for
+// whichever happened to be sampled that hour, so this calibrates one
+// representative train per species instead.
+async function calibrateKeikyuOffsetsBySpecies(fromStation, weekdayTrains) {
+  const fromLabel = KEIKYU_STATION_LABELS[fromStation];
+  // Picking blindly by "first train of this species" can land on one bound
+  // for a branch (e.g. Haneda Airport) that never reaches the other shared
+  // stations at all, giving that whole species an empty calibration. Prefer
+  // a sample whose destination isn't one of the known short/branch ones.
+  const shortDestinations = new Set([
+    ...Object.keys(DEST_REACH.keikyu.south),
+    ...Object.keys(DEST_REACH.keikyu.north),
+  ]);
+  const bySpecies = {};
+  for (const t of weekdayTrains) {
+    if (!bySpecies[t.trType]) bySpecies[t.trType] = [];
+    bySpecies[t.trType].push(t);
+  }
+  const offsetsBySpecies = {};
+  for (const [species, candidates] of Object.entries(bySpecies)) {
+    const t = candidates.find((c) => !shortDestinations.has(c.dest)) || candidates[0];
+    const html = await get(`https://ekitan.com${t.href}`, KEIKYU_UA);
+    const times = extractKeikyuStopTimes(html);
+    const fromTime = times[fromLabel];
+    if (!fromTime) {
+      await sleep(200);
+      continue;
+    }
+    const fromMin = toMin(fromTime);
+    const offsets = {};
+    for (const stKey of Object.keys(KEIKYU_STATION_LABELS)) {
+      if (stKey === fromStation) continue;
+      const label = KEIKYU_STATION_LABELS[stKey];
+      if (times[label]) {
+        let diff = toMin(times[label]) - fromMin;
+        if (diff < 0) diff += 24 * 60;
+        offsets[stKey] = diff;
+      }
+    }
+    offsetsBySpecies[t.trType] = offsets;
+    await sleep(200);
+  }
+  return offsetsBySpecies;
+}
+
+async function buildKeikyuStationDirection(station, dir) {
+  const slCode = KEIKYU_SLCODE[station];
+  const ekitanDir = KEIKYU_DIR_TO_EKITAN[dir];
+  const [wdHtml, weHtml] = await Promise.all([
+    get(`https://ekitan.com/timetable/railway/line-station/${slCode}/d1?dw=0`, KEIKYU_UA),
+    get(`https://ekitan.com/timetable/railway/line-station/${slCode}/d1?dw=2`, KEIKYU_UA),
+  ]);
+
+  // 普通/特急/快特 all verified (by inspecting sample train stop lists) to
+  // call at all of shinagawa/kawasaki/yokohama; other species (エアポート
+  // 急行/快特, アクセス特急, イブニング・ウィング) are airport-branch or
+  // Narita-through specials not verified against this route, so excluded.
+  const KEIKYU_SPECIES = new Set(["普通", "特急", "快特"]);
+  const filterLocal = (html) =>
+    parseKeikyuSections(html)
+      .filter((t) => t.dir === ekitanDir && KEIKYU_SPECIES.has(t.trType));
+
+  const weekday = filterLocal(wdHtml);
+  const weekend = filterLocal(weHtml);
+
+  const offsetsBySpecies = await calibrateKeikyuOffsetsBySpecies(station, weekday);
+  const fromIdx = STATIONS.indexOf(station);
+
+  const buildTrains = (trains) => {
+    const out = trains.map((t) => {
+      const depMinTotal = t.hour * 60 + t.minute;
+      const arrivals = {};
+      for (const toStation of Object.keys(KEIKYU_STATION_LABELS)) {
+        if (toStation === station) continue;
+        const toIdx = STATIONS.indexOf(toStation);
+        if (dir === "south" && toIdx <= fromIdx) continue;
+        if (dir === "north" && toIdx >= fromIdx) continue;
+        if (!isReachable("keikyu", dir, t.dest, toIdx)) continue;
+        const offset = (offsetsBySpecies[t.trType] || {})[toStation];
+        if (offset == null) continue;
+        arrivals[toStation] = depMinTotal + offset;
+      }
+      return {
+        dep: `${pad2(t.hour % 24)}:${pad2(t.minute)}`,
+        depMinTotal,
+        destLabel: t.dest,
+        arrivals,
+      };
+    });
+    out.sort((a, b) => a.depMinTotal - b.depMinTotal);
+    return out;
+  };
+
+  return { weekday: buildTrains(weekday), weekend: buildTrains(weekend) };
+}
+
 async function main() {
   const result = {
     generatedAt: new Date().toISOString(),
-    source: "https://timetables.jreast.co.jp/ (JR東日本 各駅時刻表)",
+    source: "https://timetables.jreast.co.jp/ (JR東日本 各駅時刻表), https://ekitan.com/ (京急電鉄 各駅時刻表)",
     note: "区間ごとの所要時間は時間帯別にサンプル列車で実測した値を使用（平日ダイヤの実測値を平日・土休日共通で使用）。行き先が短い列車（蒲田止まり等）は到達しない駅の組み合わせでは自動的に除外されます。",
     stations: STATIONS,
     stationLabels: STATION_LABELS,
-    lines: { keihinTohoku: { south: {}, north: {} }, tokaido: { south: {}, north: {} } },
+    lines: {
+      keihinTohoku: { south: {}, north: {} },
+      tokaido: { south: {}, north: {} },
+      keikyu: { south: {}, north: {} },
+    },
   };
 
   const prefixes = {};
@@ -303,6 +462,18 @@ async function main() {
         if (built) result.lines[line][dir][station] = built;
       }
     }
+  }
+
+  // Keikyu only covers the shinagawa/kawasaki/yokohama overlap.
+  const keikyuCombos = [
+    ["shinagawa", "south"],
+    ["kawasaki", "south"],
+    ["kawasaki", "north"],
+    ["yokohama", "north"],
+  ];
+  for (const [station, dir] of keikyuCombos) {
+    process.stdout.write(`fetching ${station} keikyu ${dir}...\n`);
+    result.lines.keikyu[dir][station] = await buildKeikyuStationDirection(station, dir);
   }
 
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
