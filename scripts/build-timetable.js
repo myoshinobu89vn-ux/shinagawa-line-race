@@ -79,6 +79,17 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+// JR's timetable pages live under a path segment like ".../2608/timetable/..."
+// that changes periodically (observed going 2607 -> 2608 between two runs a
+// week apart) — it's not tied to the March dia revision specifically. Rather
+// than hardcode it, read it off the station's own index page each run.
+async function discoverPrefix(stationCode) {
+  const html = await get(`https://timetables.jreast.co.jp/timetable/list${stationCode}.html`);
+  const m = html.match(new RegExp(`\\.\\./(\\d+)/timetable/tt${stationCode}/`));
+  if (!m) throw new Error(`Could not discover timetable path prefix for station ${stationCode}`);
+  return m[1];
+}
+
 function pad2(n) {
   return String(n).padStart(2, "0");
 }
@@ -128,6 +139,23 @@ function filterTrains(lineKey, trains) {
   return trains;
 }
 
+// Parses the page's own "行き先・経由" (destination) legend, e.g.
+// <dt>行き先・経由</dt><dd><span>無印=大船</span><span>磯=磯子</span>...</dd>
+// so each destination code (including the unmarked "無印" case, whose real
+// destination varies by station/line/direction) resolves to its actual label
+// straight from JR's own page instead of a guessed/hardcoded table.
+function parseDestLegend(html) {
+  const idx = html.indexOf("行き先・経由");
+  if (idx < 0) return {};
+  const ddMatch = html.slice(idx, idx + 2000).match(/<dd>([\s\S]*?)<\/dd>/);
+  if (!ddMatch) return {};
+  const map = {};
+  for (const m of ddMatch[1].matchAll(/<span>([^<=]+)=([^<]+)<\/span>/g)) {
+    map[m[1]] = m[2];
+  }
+  return map;
+}
+
 function sampleByHour(list) {
   const byHour = {};
   for (const t of list) {
@@ -152,12 +180,12 @@ function extractAllStopTimes(html) {
 // minutes later it reaches every other shared station it stops at. Travel
 // time isn't constant across the day (rush hour dwell adds a couple of
 // minutes), so this is calibrated per hour rather than once globally.
-async function calibrateOffsets(fromStation, weekdayTrains) {
+async function calibrateOffsets(fromStation, weekdayTrains, prefix) {
   const fromLabel = STATION_LABELS[fromStation];
   const samples = sampleByHour(weekdayTrains);
   const offsetsByHour = {};
   for (const t of samples) {
-    const html = await get(`https://timetables.jreast.co.jp/2607/train/${t.link}`);
+    const html = await get(`https://timetables.jreast.co.jp/${prefix}/train/${t.link}`);
     const times = extractAllStopTimes(html);
     const fromTime = times[fromLabel];
     if (!fromTime) {
@@ -204,12 +232,12 @@ function isReachable(line, dir, dest, toIdx) {
   return dir === "south" ? toIdx <= reach : toIdx >= reach;
 }
 
-async function buildStationLineDirection(station, line, dir) {
+async function buildStationLineDirection(station, line, dir, prefix) {
   const stationCfg = STATION_PAGES[station][line];
   if (!stationCfg || !stationCfg[dir]) return null;
   const stationCode = STATION_PAGES[station].code;
   const dirCode = stationCfg[dir];
-  const base = `https://timetables.jreast.co.jp/2607/timetable/tt${stationCode}`;
+  const base = `https://timetables.jreast.co.jp/${prefix}/timetable/tt${stationCode}`;
 
   const [wdHtml, weHtml] = await Promise.all([
     get(`${base}/${stationCode}${dirCode}0.html`),
@@ -218,8 +246,9 @@ async function buildStationLineDirection(station, line, dir) {
 
   const weekday = filterTrains(line, parseDepartureList(wdHtml));
   const weekend = filterTrains(line, parseDepartureList(weHtml));
+  const destLabels = parseDestLegend(wdHtml);
 
-  const offsetsByHour = await calibrateOffsets(station, weekday);
+  const offsetsByHour = await calibrateOffsets(station, weekday, prefix);
   const fromIdx = STATIONS.indexOf(station);
 
   const buildTrains = (trains) => {
@@ -236,7 +265,12 @@ async function buildStationLineDirection(station, line, dir) {
         if (offset == null) continue;
         arrivals[toStation] = depMinTotal + offset;
       }
-      return { dep: `${pad2(t.hour % 24)}:${pad2(t.minute)}`, depMinTotal, dest: t.dest, arrivals };
+      return {
+        dep: `${pad2(t.hour % 24)}:${pad2(t.minute)}`,
+        depMinTotal,
+        destLabel: destLabels[t.dest] || null,
+        arrivals,
+      };
     });
     out.sort((a, b) => a.depMinTotal - b.depMinTotal);
     return out;
@@ -255,12 +289,17 @@ async function main() {
     lines: { keihinTohoku: { south: {}, north: {} }, tokaido: { south: {}, north: {} } },
   };
 
+  const prefixes = {};
+  for (const station of STATIONS) {
+    prefixes[station] = await discoverPrefix(STATION_PAGES[station].code);
+  }
+
   for (const line of ["keihinTohoku", "tokaido"]) {
     for (const dir of ["south", "north"]) {
       for (const station of STATIONS) {
         if (!STATION_PAGES[station][line][dir]) continue;
         process.stdout.write(`fetching ${station} ${line} ${dir}...\n`);
-        const built = await buildStationLineDirection(station, line, dir);
+        const built = await buildStationLineDirection(station, line, dir, prefixes[station]);
         if (built) result.lines[line][dir][station] = built;
       }
     }

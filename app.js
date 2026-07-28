@@ -21,7 +21,7 @@ function nowInfo() {
   const d = new Date();
   return {
     date: d,
-    minTotal: d.getHours() * 60 + d.getMinutes(),
+    totalSeconds: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(),
     dayOfWeek: d.getDay(), // 0=Sun..6=Sat
   };
 }
@@ -42,17 +42,21 @@ function direction(from, to) {
   return dataset.stations.indexOf(to) > dataset.stations.indexOf(from) ? "south" : "north";
 }
 
-// Finds the next N trains (that actually reach `to`) at or after `earliestMin`.
+// Finds the next N trains (that actually reach `to`) at or after
+// `earliestSeconds`. Trains depart at second :00 of their listed minute, so
+// this compares in seconds rather than minutes — otherwise a train scheduled
+// for the current minute would still show as "next" for the rest of that
+// minute even after it has actually left.
 // depMinTotal can exceed 1440 for the post-midnight tail of the service day,
 // so if it's currently the small hours (before first train), we shift
-// `earliestMin` into that same 1440+ space to line up correctly.
-function findNextTrains(list, to, earliestMin, count) {
+// `earliestSeconds` into that same range to line up correctly.
+function findNextTrains(list, to, earliestSeconds, count) {
   const reaches = (t) => t.arrivals[to] != null;
-  const candidates = list.filter((t) => reaches(t) && t.depMinTotal >= earliestMin);
+  const candidates = list.filter((t) => reaches(t) && t.depMinTotal * 60 >= earliestSeconds);
   if (candidates.length > 0) return candidates.slice(0, count);
-  if (earliestMin < 300) {
-    const shifted = earliestMin + 1440;
-    const tail = list.filter((t) => reaches(t) && t.depMinTotal >= shifted);
+  if (earliestSeconds < 300 * 60) {
+    const shifted = earliestSeconds + 1440 * 60;
+    const tail = list.filter((t) => reaches(t) && t.depMinTotal * 60 >= shifted);
     if (tail.length > 0) return tail.slice(0, count);
   }
   return [];
@@ -70,8 +74,8 @@ function render() {
   const mode = document.querySelector(".daytype-toggle button.active").dataset.mode;
   const dayType = resolveDayType(mode, now.dayOfWeek);
 
-  const bufferMin = Math.max(0, parseInt(el("bufferInput").value, 10) || 0);
-  const earliest = now.minTotal + bufferMin;
+  const bufferMin = parseInt(el("bufferInput").value, 10) || 0;
+  const earliest = now.totalSeconds + bufferMin * 60;
 
   const keihinList = (dataset.lines.keihinTohoku[dir][from] || {})[dayType] || [];
   const tokaidoList = (dataset.lines.tokaido[dir][from] || {})[dayType] || [];
@@ -138,7 +142,7 @@ function renderLine(prefix, to, nextTrains) {
   const first = nextTrains[0];
   depEl.textContent = formatHM(first.depMinTotal);
   arrEl.textContent = formatHM(first.arrivals[to]);
-  destEl.textContent = destLabel(first.dest) ? `${destLabel(first.dest)}行` : "";
+  destEl.textContent = first.destLabel ? `${first.destLabel}行` : "";
   subEl.textContent = "";
 
   upcomingEl.innerHTML = nextTrains
@@ -148,40 +152,6 @@ function renderLine(prefix, to, nextTrains) {
         `<li><span class="dep">${formatHM(t.depMinTotal)}発</span><span class="arr">${formatHM(t.arrivals[to])}着</span></li>`
     )
     .join("");
-}
-
-const DEST_LABEL_MAP = {
-  "無印": null, // resolved per-line/direction below when needed; usually the base terminus
-  "磯": "磯子",
-  "蒲": "蒲田",
-  "桜": "桜木町",
-  "鶴": "鶴見",
-  "神": "東神奈川",
-  "浦": "南浦和",
-  "赤": "赤羽",
-  "上": "上野",
-  "熱": "熱海",
-  "小": "小田原",
-  "平": "平塚",
-  "国": "国府津",
-  "下": "伊豆急下田",
-  "伊": "伊東",
-  "沼": "沼津",
-  "修": "修善寺",
-  "宇": "宇都宮",
-  "金": "小金井",
-  "籠": "籠原",
-  "古": "古河",
-  "東": "東京",
-  "品": "品川",
-  "前": "前橋",
-  "出": "出雲市",
-  "高": "高松",
-  "琴": "琴平",
-};
-
-function destLabel(code) {
-  return DEST_LABEL_MAP[code] || null;
 }
 
 function updateStationLabels() {
@@ -266,7 +236,7 @@ function setupBufferInput() {
   const commit = () => {
     let v = parseInt(input.value, 10);
     if (Number.isNaN(v)) v = 0;
-    v = Math.min(15, Math.max(0, v));
+    v = Math.min(15, Math.max(-15, v));
     input.value = v;
     localStorage.setItem(STORAGE_KEY_BUFFER, String(v));
     render();
@@ -274,7 +244,7 @@ function setupBufferInput() {
 
   input.addEventListener("change", commit);
   el("bufferMinus").addEventListener("click", () => {
-    input.value = Math.max(0, (parseInt(input.value, 10) || 0) - 1);
+    input.value = Math.max(-15, (parseInt(input.value, 10) || 0) - 1);
     commit();
   });
   el("bufferPlus").addEventListener("click", () => {
