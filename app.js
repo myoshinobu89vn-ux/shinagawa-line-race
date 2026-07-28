@@ -113,16 +113,17 @@ function render() {
   for (const { line } of results) el(`card-${line.key}`).classList.remove("winner");
   banner.className = "result-banner";
 
+  // Compare whichever lines still have a train today; lines that have
+  // finished for the day just drop out of the comparison (their cards
+  // already show "本日の運行終了" individually via renderLine).
   const running = results.filter((r) => r.next.length > 0);
   if (running.length === 0) {
     banner.innerHTML = "本日の運行は終了しました";
-  } else if (running.length < results.length) {
-    const names = running.map((r) => r.line.label).join("・");
-    banner.innerHTML = `${names}のみ運行中`;
-    for (const r of running) {
-      el(`card-${r.line.key}`).classList.add("winner");
-      banner.classList.add(`win-${r.line.colorClass}`);
-    }
+  } else if (running.length === 1) {
+    const only = running[0];
+    banner.innerHTML = `${only.line.label}のみ運行中<span class="diff">${formatHM(only.next[0].arrivals[to])}着</span>`;
+    el(`card-${only.line.key}`).classList.add("winner");
+    banner.classList.add(`win-${only.line.colorClass}`);
   } else {
     const bestTime = Math.min(...running.map((r) => r.next[0].arrivals[to]));
     const winners = running.filter((r) => r.next[0].arrivals[to] === bestTime);
@@ -146,38 +147,34 @@ function render() {
   }
 }
 
+// Cards and their "later trains" lists share one horizontally-scrolling row
+// (one column per line) so scrolling to see a line's card also brings its
+// upcoming-trains list along, instead of two independently-scrolling rows.
 function renderCards(lines) {
   const container = el("cardsContainer");
-  const upcoming = el("upcomingContainer");
   container.innerHTML = lines
     .map(
       (line) => `
-    <div class="card" id="card-${line.key}">
-      <div class="card-title">
-        <div class="card-title-name"><span class="line-dot ${line.colorClass}"></span>${line.label}</div>
-        <span class="badge-dest" id="${line.key}Dest"></span>
-      </div>
-      <div class="card-times">
-        <div class="time-block">
-          <span class="time-label" id="${line.key}DepLabel"></span>
-          <span class="time-value" id="${line.key}Dep">--:--</span>
+    <div class="line-col">
+      <div class="card" id="card-${line.key}">
+        <div class="card-title">
+          <div class="card-title-name"><span class="line-dot ${line.colorClass}"></span>${line.label}</div>
+          <span class="badge-dest" id="${line.key}Dest"></span>
         </div>
-        <div class="arrow">↓</div>
-        <div class="time-block">
-          <span class="time-label" id="${line.key}ArrLabel"></span>
-          <span class="time-value" id="${line.key}Arr">--:--</span>
+        <div class="card-times">
+          <div class="time-block">
+            <span class="time-label" id="${line.key}DepLabel"></span>
+            <span class="time-value" id="${line.key}Dep">--:--</span>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="time-block">
+            <span class="time-label" id="${line.key}ArrLabel"></span>
+            <span class="time-value" id="${line.key}Arr">--:--</span>
+          </div>
         </div>
+        <div class="card-sub" id="${line.key}Sub"></div>
       </div>
-      <div class="card-sub" id="${line.key}Sub"></div>
-    </div>`
-    )
-    .join("");
-  upcoming.innerHTML = lines
-    .map(
-      (line) => `
-    <div class="upcoming-col">
-      <div class="upcoming-col-title"><span class="line-dot ${line.colorClass}"></span>${line.label}</div>
-      <ul id="${line.key}Upcoming"></ul>
+      <ul class="upcoming-col" id="${line.key}Upcoming"></ul>
     </div>`
     )
     .join("");

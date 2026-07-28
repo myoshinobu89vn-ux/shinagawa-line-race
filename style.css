@@ -215,9 +215,10 @@ body {
   margin-top: 6px;
 }
 
-/* Cards are ordered fastest-first, left to right. With 2 lines they share
-   the row evenly; once more lines don't fit at a readable width, the row
-   scrolls horizontally instead of squeezing every card down. */
+/* Each line gets one column (card + its later-trains list stacked below),
+   ordered fastest-first left to right. With 2 lines the columns share the
+   row evenly; once more lines don't fit at a readable width, the whole
+   column scrolls horizontally together instead of squeezing down. */
 .cards {
   display: flex;
   gap: 10px;
@@ -227,10 +228,16 @@ body {
   scroll-snap-type: x proximity;
 }
 
-.card {
+.line-col {
   flex: 1 1 140px;
   min-width: 140px;
   scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
   background: var(--card-bg);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -334,35 +341,7 @@ body {
   min-height: 14px;
 }
 
-.upcoming h2 {
-  font-size: 13px;
-  color: var(--text-dim);
-  margin: 0 0 6px;
-  font-weight: 600;
-}
-
-.upcoming-cols {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
 .upcoming-col {
-  flex: 1 1 140px;
-  min-width: 140px;
-}
-
-.upcoming-col-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 4px;
-}
-
-.upcoming-col ul {
   list-style: none;
   margin: 0;
   padding: 0;
