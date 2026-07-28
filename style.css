@@ -7,6 +7,7 @@
   --keihin: #00b2e5;
   --tokaido: #f68b1e;
   --keikyu: #e2445c;
+  --yokosuka: #6c8ebf;
   --win: #33d17a;
   --border: rgba(255, 255, 255, 0.08);
   --radius: 16px;
@@ -201,6 +202,11 @@ body {
   box-shadow: 0 0 0 1px var(--keikyu) inset;
 }
 
+.result-banner.win-yokosuka {
+  border-color: var(--yokosuka);
+  box-shadow: 0 0 0 1px var(--yokosuka) inset;
+}
+
 .result-banner .diff {
   display: block;
   font-size: 13px;
@@ -209,33 +215,22 @@ body {
   margin-top: 6px;
 }
 
+/* Cards are ordered fastest-first, left to right. With 2 lines they share
+   the row evenly; once more lines don't fit at a readable width, the row
+   scrolls horizontally instead of squeezing every card down. */
 .cards {
-  display: grid;
+  display: flex;
   gap: 10px;
-}
-
-.cards.cols-2 {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.cards.cols-3 {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.cards.cols-3 .card {
-  padding: 8px 8px;
-}
-
-.cards.cols-3 .time-value {
-  font-size: 16px;
-}
-
-.cards.cols-3 .card-title {
-  font-size: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
 }
 
 .card {
-  min-width: 0;
+  flex: 1 1 140px;
+  min-width: 140px;
+  scroll-snap-align: start;
   background: var(--card-bg);
   border-radius: var(--radius);
   padding: 10px 12px;
@@ -298,6 +293,10 @@ body {
   background: var(--keikyu);
 }
 
+.line-dot.yokosuka {
+  background: var(--yokosuka);
+}
+
 .card-times {
   display: flex;
   flex-direction: column;
@@ -343,10 +342,15 @@ body {
 }
 
 .upcoming-cols {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  display: flex;
   gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.upcoming-col {
+  flex: 1 1 140px;
+  min-width: 140px;
 }
 
 .upcoming-col-title {

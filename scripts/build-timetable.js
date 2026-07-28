@@ -34,11 +34,11 @@ const STATION_LABELS = {
 // / 0788091.html (weekend).
 const STATION_PAGES = {
   ueno: { code: "0204", keihinTohoku: { south: "12" }, tokaido: { south: "14" } },
-  tokyo: { code: "1039", keihinTohoku: { south: "14", north: "15" }, tokaido: { south: "10", north: "16" } },
-  shimbashi: { code: "0877", keihinTohoku: { south: "07", north: "08" }, tokaido: { south: "01", north: "02" } },
-  shinagawa: { code: "0788", keihinTohoku: { south: "09", north: "10" }, tokaido: { south: "03", north: "04" } },
+  tokyo: { code: "1039", keihinTohoku: { south: "14", north: "15" }, tokaido: { south: "10", north: "16" }, yokosuka: { south: "13" } },
+  shimbashi: { code: "0877", keihinTohoku: { south: "07", north: "08" }, tokaido: { south: "01", north: "02" }, yokosuka: { south: "05", north: "06" } },
+  shinagawa: { code: "0788", keihinTohoku: { south: "09", north: "10" }, tokaido: { south: "03", north: "04" }, yokosuka: { south: "07", north: "08" } },
   kawasaki: { code: "0526", keihinTohoku: { south: "04", north: "05" }, tokaido: { south: "01", north: "02" } },
-  yokohama: { code: "1638", keihinTohoku: { north: "09" }, tokaido: { north: "02" } },
+  yokohama: { code: "1638", keihinTohoku: { north: "09" }, tokaido: { north: "02" }, yokosuka: { north: "07" } },
 };
 
 // How far a given destination code actually reaches, expressed as a position
@@ -63,6 +63,15 @@ const DEST_REACH = {
   keikyu: {
     south: { "羽田空港第１・第２ターミナル": 3.5, "京急川崎": 4, "神奈川新町": 4.5 },
     north: { "羽田空港第１・第２ターミナル": 4, "京急川崎": 4, "神奈川新町": 4.5, "品川": 3 },
+  },
+  // Yokosuka Line overlaps our set at tokyo(1)/shimbashi(2)/shinagawa(3)/
+  // yokohama(5) — it doesn't call at ueno or kawasaki (kawasaki-area service
+  // runs via a different station, Shin-Kawasaki, not walking distance from
+  // the others). "品"(Shinagawa) is the only short destination in either
+  // direction: some trains start/terminate there instead of continuing on.
+  yokosuka: {
+    south: { "品": 3 },
+    north: { "品": 3 },
   },
 };
 
@@ -157,6 +166,13 @@ function filterTrains(lineKey, trains) {
     // Plain local (普通) only — 快速/特別快速/特急 etc can skip stations we
     // care about (e.g. 特別快速 skips 新橋・川崎), too risky to mix in.
     return trains.filter((t) => t.train === "無印");
+  }
+  if (lineKey === "yokosuka") {
+    // Southbound labels these "無印"; northbound labels most of them
+    // "普,快" (普通 within our Tokyo-Yokohama segment, becoming 快速 further
+    // out toward Chiba) — both are local here, so match on "普" appearing
+    // anywhere rather than an exact "無印" match. 特急/NEX/湘南 excluded.
+    return trains.filter((t) => t.train === "無印" || t.train.includes("普"));
   }
   return trains;
 }
@@ -445,6 +461,7 @@ async function main() {
       keihinTohoku: { south: {}, north: {} },
       tokaido: { south: {}, north: {} },
       keikyu: { south: {}, north: {} },
+      yokosuka: { south: {}, north: {} },
     },
   };
 
@@ -453,10 +470,10 @@ async function main() {
     prefixes[station] = await discoverPrefix(STATION_PAGES[station].code);
   }
 
-  for (const line of ["keihinTohoku", "tokaido"]) {
+  for (const line of ["keihinTohoku", "tokaido", "yokosuka"]) {
     for (const dir of ["south", "north"]) {
       for (const station of STATIONS) {
-        if (!STATION_PAGES[station][line][dir]) continue;
+        if (!STATION_PAGES[station][line]?.[dir]) continue;
         process.stdout.write(`fetching ${station} ${line} ${dir}...\n`);
         const built = await buildStationLineDirection(station, line, dir, prefixes[station]);
         if (built) result.lines[line][dir][station] = built;
@@ -481,7 +498,11 @@ async function main() {
   console.log("Wrote", OUT_PATH);
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+module.exports = { discoverPrefix, buildStationLineDirection, STATION_PAGES };

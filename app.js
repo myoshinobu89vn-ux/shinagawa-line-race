@@ -7,6 +7,7 @@ const LINES = [
   { key: "keihinTohoku", label: "京浜東北線", colorClass: "keihin" },
   { key: "tokaido", label: "東海道線", colorClass: "tokaido" },
   { key: "keikyu", label: "京急線", colorClass: "keikyu" },
+  { key: "yokosuka", label: "横須賀線", colorClass: "yokosuka" },
 ];
 
 let dataset = null;
@@ -83,7 +84,6 @@ function render() {
   const { from, to } = currentFromTo();
   const dir = direction(from, to);
   const lines = activeLines(from, to, dir);
-  renderCards(lines);
 
   const mode = document.querySelector(".daytype-toggle button.active").dataset.mode;
   const dayType = resolveDayType(mode, now.dayOfWeek);
@@ -92,12 +92,22 @@ function render() {
   const earliest = now.totalSeconds + bufferMin * 60;
 
   const toLabel = dataset.stationLabels[to];
-  const results = lines.map((line) => {
+  let results = lines.map((line) => {
     const list = (dataset.lines[line.key][dir][from] || {})[dayType] || [];
     const next = findNextTrains(list, to, earliest, 4);
-    renderLine(line.key, to, next);
     return { line, next };
   });
+
+  // Fastest-first, left to right; lines with no more trains today sink to the end.
+  results = results.sort((a, b) => {
+    if (a.next.length === 0 && b.next.length === 0) return 0;
+    if (a.next.length === 0) return 1;
+    if (b.next.length === 0) return -1;
+    return a.next[0].arrivals[to] - b.next[0].arrivals[to];
+  });
+
+  renderCards(results.map((r) => r.line));
+  for (const { line, next } of results) renderLine(line.key, to, next);
 
   const banner = el("resultBanner");
   for (const { line } of results) el(`card-${line.key}`).classList.remove("winner");
@@ -139,7 +149,6 @@ function render() {
 function renderCards(lines) {
   const container = el("cardsContainer");
   const upcoming = el("upcomingContainer");
-  container.className = `cards cols-${lines.length}`;
   container.innerHTML = lines
     .map(
       (line) => `
