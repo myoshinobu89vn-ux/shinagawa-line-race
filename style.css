@@ -40,6 +40,13 @@ body {
   gap: 12px;
 }
 
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .app-header h1 {
   font-size: 20px;
   line-height: 1.3;
@@ -50,6 +57,20 @@ body {
   margin: 0;
   color: var(--text-dim);
   font-size: 14px;
+}
+
+.picker-trigger {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .station-row {
@@ -375,6 +396,119 @@ body {
 
 .upcoming-col li .arr {
   color: var(--text-dim);
+}
+
+.station-picker {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.station-picker.hidden {
+  display: none;
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.picker-nav-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-nav-btn.hidden {
+  visibility: hidden;
+}
+
+.picker-title {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.picker-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.kana-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.kana-grid.hidden {
+  display: none;
+}
+
+.kana-btn {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kana-btn.empty {
+  background: transparent;
+  visibility: hidden;
+}
+
+.kana-btn.disabled {
+  color: var(--text-dim);
+  opacity: 0.35;
+  cursor: default;
+}
+
+.station-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.station-list.hidden {
+  display: none;
+}
+
+.station-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 14px 16px;
+  cursor: pointer;
 }
 
 .app-footer {

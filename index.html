@@ -17,8 +17,17 @@
 <body>
 <div class="app">
   <header class="app-header">
-    <h1>京浜東北線 vs 東海道線</h1>
-    <p class="subtitle" id="routeTitle">品川 &rarr; 川崎</p>
+    <div class="app-header-text">
+      <h1>京浜東北線 vs 東海道線</h1>
+      <p class="subtitle" id="routeTitle">品川 &rarr; 川崎</p>
+    </div>
+    <button id="openPicker" class="picker-trigger" aria-label="区間選択">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="6" cy="6" r="2.6"></circle>
+        <circle cx="18" cy="18" r="2.6"></circle>
+        <path d="M8.2 7.6 L15.8 16.4"></path>
+      </svg>
+    </button>
   </header>
 
   <section class="station-row">
@@ -50,6 +59,18 @@
   </section>
 
   <section class="cards" id="cardsContainer"></section>
+
+  <div id="stationPicker" class="station-picker hidden" role="dialog" aria-modal="true" aria-label="区間選択">
+    <div class="picker-header">
+      <button id="pickerBack" class="picker-nav-btn hidden" aria-label="戻る">←</button>
+      <span class="picker-title" id="pickerTitle">駅を選択</span>
+      <button id="pickerClose" class="picker-nav-btn" aria-label="閉じる">×</button>
+    </div>
+    <div class="picker-body">
+      <div class="kana-grid" id="kanaGrid"></div>
+      <ul class="station-list hidden" id="stationList"></ul>
+    </div>
+  </div>
 
   <footer class="app-footer">
     <p id="datasetNote"></p>

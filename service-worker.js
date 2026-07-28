@@ -1,4 +1,4 @@
-const CACHE_NAME = "skr-cache-v7";
+const CACHE_NAME = "skr-cache-v8";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const ASSETS = [
   "./app.js",
   "./manifest.json",
   "./data/timetable.json",
+  "./data/stations.json",
   "./icons/icon-180.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

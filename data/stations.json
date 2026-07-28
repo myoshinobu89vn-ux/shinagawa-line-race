@@ -1,0 +1,8 @@
+{
+  "ueno": { "label": "上野", "kana": "うえの" },
+  "tokyo": { "label": "東京", "kana": "とうきょう" },
+  "shimbashi": { "label": "新橋", "kana": "しんばし" },
+  "shinagawa": { "label": "品川", "kana": "しながわ" },
+  "kawasaki": { "label": "川崎", "kana": "かわさき" },
+  "yokohama": { "label": "横浜", "kana": "よこはま" }
+}

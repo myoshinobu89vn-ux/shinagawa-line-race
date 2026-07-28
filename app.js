@@ -10,7 +10,23 @@ const LINES = [
   { key: "yokosuka", label: "横須賀線", colorClass: "yokosuka" },
 ];
 
+// Standard seion gojuon table (no dakuten/handakuten yet — none of today's
+// station readings need them). null = no character at that grid position.
+const GOJUON_ROWS = [
+  ["あ", "い", "う", "え", "お"],
+  ["か", "き", "く", "け", "こ"],
+  ["さ", "し", "す", "せ", "そ"],
+  ["た", "ち", "つ", "て", "と"],
+  ["な", "に", "ぬ", "ね", "の"],
+  ["は", "ひ", "ふ", "へ", "ほ"],
+  ["ま", "み", "む", "め", "も"],
+  ["や", null, "ゆ", null, "よ"],
+  ["ら", "り", "る", "れ", "ろ"],
+  ["わ", null, null, "を", "ん"],
+];
+
 let dataset = null;
+let stationsMaster = null;
 
 const el = (id) => document.getElementById(id);
 
@@ -53,6 +69,28 @@ function direction(from, to) {
 // covers the shinagawa/kawasaki/yokohama overlap, so it drops out otherwise).
 function activeLines(from, to, dir) {
   return LINES.filter((line) => dataset.lines[line.key]?.[dir]?.[from]);
+}
+
+// Does this line have at least one actual train from->to (not just a data
+// block for `from` in this direction — an individual train's destination
+// may fall short of `to` even when the line generally passes through it).
+function lineReachesStation(lineKey, dir, from, to) {
+  const data = dataset.lines[lineKey]?.[dir]?.[from];
+  if (!data) return false;
+  const trains = [...(data.weekday || []), ...(data.weekend || [])];
+  return trains.some((t) => t.arrivals[to] != null);
+}
+
+// Stations reachable from `from` where 2+ lines actually compete (a pair
+// only one line serves isn't a race, so the station picker shouldn't offer
+// it as a destination).
+function competingStations(from) {
+  return dataset.stations.filter((to) => {
+    if (to === from) return false;
+    const dir = direction(from, to);
+    const linesReaching = LINES.filter((line) => lineReachesStation(line.key, dir, from, to));
+    return linesReaching.length >= 2;
+  });
 }
 
 // Finds the next N trains (that actually reach `to`) at or after
@@ -211,6 +249,139 @@ function renderLine(lineKey, to, nextTrains) {
     .join("");
 }
 
+// --- Station picker (区間選択): 五十音 -> 駅一覧 -> (自動遷移 or 到着駅を絞り込み) ---
+
+const picker = {
+  mode: "from", // "from" | "to"
+  contextFrom: null,
+  screen: "kana", // "kana" | "list"
+  selectedKana: null,
+};
+
+function stationsStartingWith(kana, candidateKeys) {
+  return candidateKeys.filter((key) => stationsMaster[key].kana.startsWith(kana));
+}
+
+// Stations worth offering as a starting point at all (dead-end stations
+// with no competing destination are excluded from the "from" list).
+function candidateFromStations() {
+  return dataset.stations.filter((s) => competingStations(s).length > 0);
+}
+
+function validInitials(mode, contextFrom) {
+  const candidates = mode === "from" ? candidateFromStations() : competingStations(contextFrom);
+  return new Set(candidates.map((key) => stationsMaster[key].kana[0]));
+}
+
+function applyStationSelection(from, to) {
+  el("fromSelect").value = from;
+  el("toSelect").value = to;
+  localStorage.setItem(STORAGE_KEY_FROM, from);
+  localStorage.setItem(STORAGE_KEY_TO, to);
+  updateStationLabels();
+  render();
+}
+
+function openPicker() {
+  picker.mode = "from";
+  picker.contextFrom = null;
+  picker.screen = "kana";
+  picker.selectedKana = null;
+  el("stationPicker").classList.remove("hidden");
+  renderPickerScreen();
+}
+
+function closePicker() {
+  el("stationPicker").classList.add("hidden");
+}
+
+function pickerBack() {
+  if (picker.screen === "list") {
+    picker.screen = "kana";
+  } else if (picker.mode === "to") {
+    picker.mode = "from";
+    picker.contextFrom = null;
+    picker.screen = "kana";
+  }
+  renderPickerScreen();
+}
+
+function selectKana(kana) {
+  picker.screen = "list";
+  picker.selectedKana = kana;
+  renderPickerScreen();
+}
+
+function selectStation(key) {
+  if (picker.mode === "from") {
+    const competing = competingStations(key);
+    if (competing.length === 1) {
+      applyStationSelection(key, competing[0]);
+      closePicker();
+      return;
+    }
+    if (competing.length === 0) return; // shouldn't happen, already filtered out
+    picker.mode = "to";
+    picker.contextFrom = key;
+    picker.screen = "kana";
+    picker.selectedKana = null;
+    renderPickerScreen();
+  } else {
+    applyStationSelection(picker.contextFrom, key);
+    closePicker();
+  }
+}
+
+function renderPickerScreen() {
+  const title = el("pickerTitle");
+  const backBtn = el("pickerBack");
+  const kanaGrid = el("kanaGrid");
+  const stationList = el("stationList");
+
+  backBtn.classList.toggle("hidden", picker.mode === "from" && picker.screen === "kana");
+
+  if (picker.screen === "kana") {
+    title.textContent = picker.mode === "from" ? "出発駅を選択" : "到着駅を選択";
+    kanaGrid.classList.remove("hidden");
+    stationList.classList.add("hidden");
+    const valid = validInitials(picker.mode, picker.contextFrom);
+    kanaGrid.innerHTML = GOJUON_ROWS.map((row) =>
+      row
+        .map((ch) => {
+          if (!ch) return `<span class="kana-btn empty"></span>`;
+          const enabled = valid.has(ch);
+          return enabled
+            ? `<button class="kana-btn" data-kana="${ch}">${ch}</button>`
+            : `<button class="kana-btn disabled" disabled>${ch}</button>`;
+        })
+        .join("")
+    ).join("");
+  } else {
+    title.textContent = picker.mode === "from" ? "駅を選択" : "到着駅を選択";
+    kanaGrid.classList.add("hidden");
+    stationList.classList.remove("hidden");
+    const candidates = picker.mode === "from" ? candidateFromStations() : competingStations(picker.contextFrom);
+    const matches = stationsStartingWith(picker.selectedKana, candidates);
+    stationList.innerHTML = matches
+      .map((key) => `<li><button class="station-item" data-station="${key}">${stationsMaster[key].label}</button></li>`)
+      .join("");
+  }
+}
+
+function setupStationPicker() {
+  el("openPicker").addEventListener("click", openPicker);
+  el("pickerClose").addEventListener("click", closePicker);
+  el("pickerBack").addEventListener("click", pickerBack);
+  el("kanaGrid").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-kana]");
+    if (btn) selectKana(btn.dataset.kana);
+  });
+  el("stationList").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-station]");
+    if (btn) selectStation(btn.dataset.station);
+  });
+}
+
 function updateStationLabels() {
   const { from, to } = currentFromTo();
   const fromLabel = dataset ? dataset.stationLabels[from] : from;
@@ -325,8 +496,12 @@ function fetchWithTimeout(url, ms) {
 
 async function loadDataset() {
   try {
-    const res = await fetchWithTimeout("data/timetable.json", 8000);
+    const [res, stationsRes] = await Promise.all([
+      fetchWithTimeout("data/timetable.json", 8000),
+      fetchWithTimeout("data/stations.json", 8000),
+    ]);
     dataset = await res.json();
+    stationsMaster = await stationsRes.json();
     populateStationSelects();
     updateStationLabels();
     const genDate = new Date(dataset.generatedAt);
@@ -350,6 +525,7 @@ async function loadDataset() {
 async function init() {
   setupDaytypeToggle();
   setupBufferInput();
+  setupStationPicker();
   el("swapStations").addEventListener("click", swapStations);
 
   if (!(await loadDataset())) return;
