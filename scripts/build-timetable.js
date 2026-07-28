@@ -139,6 +139,11 @@ function parseDepartureList(html) {
     const blocks = body.split('<div class="timetable_time"').slice(1);
     for (const b of blocks) {
       const destMatch = b.match(/data-dest="([^"]*)"/);
+      // Rarely, the data-dest attribute itself comes through mangled
+      // (encoding glitch on JR's end) while the visible <span class="dest">
+      // text next to the time is fine — keep it as a fallback for label
+      // resolution when the attribute doesn't match anything in the legend.
+      const visibleDestMatch = b.match(/<span class="dest">([^<]*)<\/span>/);
       const trainMatch = b.match(/data-train="([^"]*)"/);
       const minMatch = b.match(/<span class="minute">(\d{1,2})<\/span>/);
       const linkMatch = b.match(/href="(\.\.\/\.\.\/train\/[^"]+)"/);
@@ -147,6 +152,7 @@ function parseDepartureList(html) {
         hour,
         minute: parseInt(minMatch[1], 10),
         dest: destMatch ? destMatch[1] : "",
+        visibleDest: visibleDestMatch ? visibleDestMatch[1] : null,
         train: trainMatch ? trainMatch[1] : "",
         link: linkMatch[1].replace("../../train/", ""),
       });
@@ -182,6 +188,10 @@ function filterTrains(lineKey, trains) {
 // so each destination code (including the unmarked "無印" case, whose real
 // destination varies by station/line/direction) resolves to its actual label
 // straight from JR's own page instead of a guessed/hardcoded table.
+//
+// Some legend keys are themselves compound, e.g. "無印・空=成田空港" (both
+// the unmarked case and an explicit "空" marker mean 成田空港) — split those
+// on "・" so lookups by either "無印" or "空" alone still resolve.
 function parseDestLegend(html) {
   const idx = html.indexOf("行き先・経由");
   if (idx < 0) return {};
@@ -189,9 +199,25 @@ function parseDestLegend(html) {
   if (!ddMatch) return {};
   const map = {};
   for (const m of ddMatch[1].matchAll(/<span>([^<=]+)=([^<]+)<\/span>/g)) {
-    map[m[1]] = m[2];
+    for (const key of m[1].split("・")) {
+      map[key] = m[2];
+    }
   }
   return map;
+}
+
+// A train's own data-dest can also be compound, e.g. "空,鹿" for a train
+// that splits/couples into two portions with different final destinations —
+// resolve by trying each comma-separated part against the legend map.
+// `visibleDest` (the on-page text next to the time, when shown) is a last
+// resort for the rare case where data-dest itself came through mangled.
+function resolveDestLabel(destLabels, destCode, visibleDest) {
+  if (destLabels[destCode]) return destLabels[destCode];
+  for (const part of destCode.split(",")) {
+    if (destLabels[part]) return destLabels[part];
+  }
+  if (visibleDest && destLabels[visibleDest]) return destLabels[visibleDest];
+  return null;
 }
 
 function sampleByHour(list) {
@@ -284,7 +310,10 @@ async function buildStationLineDirection(station, line, dir, prefix) {
 
   const weekday = filterTrains(line, parseDepartureList(wdHtml));
   const weekend = filterTrains(line, parseDepartureList(weHtml));
-  const destLabels = parseDestLegend(wdHtml);
+  // Merge both legends: a destination that only runs on weekends (e.g. a
+  // once-a-week through service) can have a code that never appears in the
+  // weekday page's legend at all, and vice versa.
+  const destLabels = { ...parseDestLegend(wdHtml), ...parseDestLegend(weHtml) };
 
   const offsetsByHour = await calibrateOffsets(station, weekday, prefix);
   const fromIdx = STATIONS.indexOf(station);
@@ -306,7 +335,7 @@ async function buildStationLineDirection(station, line, dir, prefix) {
       return {
         dep: `${pad2(t.hour % 24)}:${pad2(t.minute)}`,
         depMinTotal,
-        destLabel: destLabels[t.dest] || null,
+        destLabel: resolveDestLabel(destLabels, t.dest, t.visibleDest),
         arrivals,
       };
     });
