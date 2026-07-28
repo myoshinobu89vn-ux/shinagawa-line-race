@@ -312,22 +312,47 @@ function setupBufferInput() {
   });
 }
 
-async function init() {
-  setupDaytypeToggle();
-  setupBufferInput();
-  el("swapStations").addEventListener("click", swapStations);
+// A hung network request (bad signal underground, a stuck service worker,
+// etc.) would otherwise leave the "読み込み中…" placeholder forever with no
+// feedback. Race the fetch against a timeout so a slow/dead connection shows
+// a retry button instead of spinning silently.
+function fetchWithTimeout(url, ms) {
+  return Promise.race([
+    fetch(url),
+    new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), ms)),
+  ]);
+}
 
+async function loadDataset() {
   try {
-    const res = await fetch("data/timetable.json");
+    const res = await fetchWithTimeout("data/timetable.json", 8000);
     dataset = await res.json();
     populateStationSelects();
     updateStationLabels();
     const genDate = new Date(dataset.generatedAt);
     el("datasetNote").textContent = `時刻表データ取得日: ${genDate.getFullYear()}/${genDate.getMonth() + 1}/${genDate.getDate()}`;
+    return true;
   } catch (e) {
-    el("resultBanner").textContent = "時刻表データの読み込みに失敗しました";
-    return;
+    const banner = el("resultBanner");
+    banner.innerHTML = "";
+    const msg = document.createElement("span");
+    msg.textContent = "時刻表データを読み込めませんでした（通信状況を確認してください）";
+    const retry = document.createElement("button");
+    retry.textContent = "再読み込み";
+    retry.className = "retry-btn";
+    retry.addEventListener("click", () => location.reload());
+    banner.appendChild(msg);
+    banner.appendChild(retry);
+    return false;
   }
+}
+
+async function init() {
+  setupDaytypeToggle();
+  setupBufferInput();
+  el("swapStations").addEventListener("click", swapStations);
+
+  if (!(await loadDataset())) return;
 
   render();
   setInterval(render, 15000);

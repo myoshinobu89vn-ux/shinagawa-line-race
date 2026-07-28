@@ -187,6 +187,19 @@ body {
   border: 1px solid var(--border);
 }
 
+.retry-btn {
+  display: block;
+  margin: 10px auto 0;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .result-banner.win-keihin {
   border-color: var(--keihin);
   box-shadow: 0 0 0 1px var(--keihin) inset;

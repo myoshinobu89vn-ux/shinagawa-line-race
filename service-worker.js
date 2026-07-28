@@ -1,4 +1,4 @@
-const CACHE_NAME = "skr-cache-v6";
+const CACHE_NAME = "skr-cache-v7";
 const ASSETS = [
   "./",
   "./index.html",
@@ -26,20 +26,25 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Network-first: this app is actively changing, so prefer the latest
+// version whenever a connection is available and only fall back to the
+// cached copy if the network fails or is too slow (e.g. no signal
+// underground) — cache-first previously meant a stale cached response could
+// win indefinitely on iOS, where Safari's SW update checks are infrequent.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((res) => {
-          if (res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    Promise.race([
+      fetch(event.request),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
+    ])
+      .then((res) => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
