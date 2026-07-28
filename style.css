@@ -502,16 +502,16 @@ body {
 .kana-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 5px;
 }
 
 .kana-btn {
-  aspect-ratio: 1;
+  height: 34px;
   border: none;
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--bg-elevated);
   color: var(--text);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
