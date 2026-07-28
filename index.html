@@ -63,12 +63,22 @@
   <div id="stationPicker" class="station-picker hidden" role="dialog" aria-modal="true" aria-label="区間選択">
     <div class="picker-header">
       <button id="pickerBack" class="picker-nav-btn hidden" aria-label="戻る">←</button>
-      <span class="picker-title" id="pickerTitle">駅を選択</span>
+      <span class="picker-title">区間選択</span>
       <button id="pickerClose" class="picker-nav-btn" aria-label="閉じる">×</button>
     </div>
     <div class="picker-body">
-      <div class="kana-grid" id="kanaGrid"></div>
+      <div class="picker-slots">
+        <div class="picker-slot" id="pickerFromSlot">
+          <span class="picker-slot-label">出発</span>
+          <span class="picker-slot-value" id="pickerFromValue">未選択</span>
+        </div>
+        <div class="picker-slot" id="pickerToSlot">
+          <span class="picker-slot-label">到着</span>
+          <span class="picker-slot-value" id="pickerToValue">―</span>
+        </div>
+      </div>
       <ul class="station-list hidden" id="stationList"></ul>
+      <div class="kana-grid" id="kanaGrid"></div>
     </div>
   </div>
 

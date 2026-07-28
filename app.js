@@ -249,13 +249,16 @@ function renderLine(lineKey, to, nextTrains) {
     .join("");
 }
 
-// --- Station picker (区間選択): 五十音 -> 駅一覧 -> (自動遷移 or 到着駅を絞り込み) ---
+// --- Station picker (区間選択): 五十音 -> (候補1件なら即確定 / 複数なら一覧から選択) ---
+// One persistent screen: confirmed from/to show as slots at the top, tapping
+// a kana narrows candidates into a list shown just above the kana grid, and
+// picking (or narrowing to) a single candidate confirms it immediately.
 
 const picker = {
-  mode: "from", // "from" | "to"
-  contextFrom: null,
-  screen: "kana", // "kana" | "list"
-  selectedKana: null,
+  from: null,
+  to: null,
+  step: "from", // "from" | "to" -- which slot is currently being filled
+  candidates: [], // station keys matching the last-tapped kana, for the current step
 };
 
 function stationsStartingWith(kana, candidateKeys) {
@@ -268,9 +271,12 @@ function candidateFromStations() {
   return dataset.stations.filter((s) => competingStations(s).length > 0);
 }
 
-function validInitials(mode, contextFrom) {
-  const candidates = mode === "from" ? candidateFromStations() : competingStations(contextFrom);
-  return new Set(candidates.map((key) => stationsMaster[key].kana[0]));
+function currentStepCandidates() {
+  return picker.step === "from" ? candidateFromStations() : competingStations(picker.from);
+}
+
+function validInitials() {
+  return new Set(currentStepCandidates().map((key) => stationsMaster[key].kana[0]));
 }
 
 function applyStationSelection(from, to) {
@@ -283,10 +289,10 @@ function applyStationSelection(from, to) {
 }
 
 function openPicker() {
-  picker.mode = "from";
-  picker.contextFrom = null;
-  picker.screen = "kana";
-  picker.selectedKana = null;
+  picker.from = null;
+  picker.to = null;
+  picker.step = "from";
+  picker.candidates = [];
   el("stationPicker").classList.remove("hidden");
   renderPickerScreen();
 }
@@ -296,76 +302,94 @@ function closePicker() {
 }
 
 function pickerBack() {
-  if (picker.screen === "list") {
-    picker.screen = "kana";
-  } else if (picker.mode === "to") {
-    picker.mode = "from";
-    picker.contextFrom = null;
-    picker.screen = "kana";
+  if (picker.candidates.length > 0) {
+    picker.candidates = [];
+  } else if (picker.step === "to") {
+    picker.step = "from";
+    picker.from = null;
+  } else {
+    closePicker();
+    return;
   }
   renderPickerScreen();
 }
 
-function selectKana(kana) {
-  picker.screen = "list";
-  picker.selectedKana = kana;
-  renderPickerScreen();
-}
-
-function selectStation(key) {
-  if (picker.mode === "from") {
+// Confirms `key` for the current step; if that was "from" and there's more
+// than one competing destination, advances to the "to" step instead of
+// closing. Also the target of kana-narrows-to-one-candidate auto-confirm.
+function confirmStation(key) {
+  if (picker.step === "from") {
+    picker.from = key;
     const competing = competingStations(key);
     if (competing.length === 1) {
       applyStationSelection(key, competing[0]);
       closePicker();
       return;
     }
-    if (competing.length === 0) return; // shouldn't happen, already filtered out
-    picker.mode = "to";
-    picker.contextFrom = key;
-    picker.screen = "kana";
-    picker.selectedKana = null;
+    picker.step = "to";
+    picker.candidates = [];
     renderPickerScreen();
   } else {
-    applyStationSelection(picker.contextFrom, key);
+    picker.to = key;
+    applyStationSelection(picker.from, key);
     closePicker();
   }
 }
 
+function selectKana(kana) {
+  const matches = stationsStartingWith(kana, currentStepCandidates());
+  if (matches.length === 1) {
+    confirmStation(matches[0]);
+    return;
+  }
+  picker.candidates = matches;
+  renderPickerScreen();
+}
+
 function renderPickerScreen() {
-  const title = el("pickerTitle");
   const backBtn = el("pickerBack");
   const kanaGrid = el("kanaGrid");
   const stationList = el("stationList");
+  const fromSlot = el("pickerFromSlot");
+  const toSlot = el("pickerToSlot");
 
-  backBtn.classList.toggle("hidden", picker.mode === "from" && picker.screen === "kana");
+  backBtn.classList.toggle("hidden", picker.step === "from" && picker.candidates.length === 0);
 
-  if (picker.screen === "kana") {
-    title.textContent = picker.mode === "from" ? "出発駅を選択" : "到着駅を選択";
-    kanaGrid.classList.remove("hidden");
-    stationList.classList.add("hidden");
-    const valid = validInitials(picker.mode, picker.contextFrom);
-    kanaGrid.innerHTML = GOJUON_ROWS.map((row) =>
-      row
-        .map((ch) => {
-          if (!ch) return `<span class="kana-btn empty"></span>`;
-          const enabled = valid.has(ch);
-          return enabled
-            ? `<button class="kana-btn" data-kana="${ch}">${ch}</button>`
-            : `<button class="kana-btn disabled" disabled>${ch}</button>`;
-        })
-        .join("")
-    ).join("");
-  } else {
-    title.textContent = picker.mode === "from" ? "駅を選択" : "到着駅を選択";
-    kanaGrid.classList.add("hidden");
+  el("pickerFromValue").textContent = picker.from ? stationsMaster[picker.from].label : "選択してください";
+  fromSlot.classList.toggle("active", picker.step === "from");
+  fromSlot.classList.toggle("filled", !!picker.from);
+
+  el("pickerToValue").textContent = picker.to
+    ? stationsMaster[picker.to].label
+    : picker.step === "to"
+    ? "選択してください"
+    : "―";
+  toSlot.classList.toggle("active", picker.step === "to");
+  toSlot.classList.toggle("filled", !!picker.to);
+  toSlot.classList.toggle("pending", picker.step === "from");
+
+  if (picker.candidates.length > 0) {
     stationList.classList.remove("hidden");
-    const candidates = picker.mode === "from" ? candidateFromStations() : competingStations(picker.contextFrom);
-    const matches = stationsStartingWith(picker.selectedKana, candidates);
-    stationList.innerHTML = matches
+    stationList.innerHTML = picker.candidates
       .map((key) => `<li><button class="station-item" data-station="${key}">${stationsMaster[key].label}</button></li>`)
       .join("");
+  } else {
+    stationList.classList.add("hidden");
+    stationList.innerHTML = "";
   }
+
+  const valid = validInitials();
+  kanaGrid.innerHTML = GOJUON_ROWS.map((row) =>
+    row
+      .map((ch) => {
+        if (!ch) return `<span class="kana-btn empty"></span>`;
+        const enabled = valid.has(ch);
+        return enabled
+          ? `<button class="kana-btn" data-kana="${ch}">${ch}</button>`
+          : `<button class="kana-btn disabled" disabled>${ch}</button>`;
+      })
+      .join("")
+  ).join("");
 }
 
 function setupStationPicker() {
@@ -378,7 +402,7 @@ function setupStationPicker() {
   });
   el("stationList").addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-station]");
-    if (btn) selectStation(btn.dataset.station);
+    if (btn) confirmStation(btn.dataset.station);
   });
 }
 

@@ -453,14 +453,56 @@ body {
   padding: 16px;
 }
 
+.picker-slots {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.picker-slot {
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.picker-slot.active {
+  border-color: var(--tokaido);
+  box-shadow: 0 0 0 1px var(--tokaido) inset;
+}
+
+.picker-slot.pending {
+  opacity: 0.5;
+}
+
+.picker-slot-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.picker-slot-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-slot:not(.filled) .picker-slot-value {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
 .kana-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
-}
-
-.kana-grid.hidden {
-  display: none;
 }
 
 .kana-btn {
@@ -487,7 +529,7 @@ body {
 
 .station-list {
   list-style: none;
-  margin: 0;
+  margin: 0 0 14px;
   padding: 0;
   display: flex;
   flex-direction: column;
