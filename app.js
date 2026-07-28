@@ -410,7 +410,6 @@ function updateStationLabels() {
   const { from, to } = currentFromTo();
   const fromLabel = dataset ? dataset.stationLabels[from] : from;
   const toLabel = dataset ? dataset.stationLabels[to] : to;
-  el("routeTitle").textContent = `${fromLabel} → ${toLabel}`;
   for (const line of LINES) {
     const depLabelEl = el(`${line.key}DepLabel`);
     const arrLabelEl = el(`${line.key}ArrLabel`);
