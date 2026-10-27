@@ -47,14 +47,17 @@ const STATION_PAGES = {
 // "south" this is the furthest-south index reached (train reaches TO if
 // toIdx <= reach); for "north" it's the furthest-north index reached (train
 // reaches TO if toIdx >= reach). +-99 means "far beyond our station range".
+// The unmarked "無印" case is keyed by its resolved label instead of the code
+// (see isReachable), since it means a different destination on each
+// station's page.
 const DEST_REACH = {
   keihinTohoku: {
-    south: { "蒲": 3.5, "鶴": 4.3, "神": 4.6, "無印": 99, "磯": 99, "桜": 99 },
-    north: { "蒲": 3.5, "無印": -99, "浦": -99, "赤": -99, "上": 0 },
+    south: { "蒲": 3.5, "鶴": 4.3, "神": 4.6, "磯": 99, "桜": 99 },
+    north: { "蒲": 3.5, "浦": -99, "赤": -99, "上": 0 },
   },
   tokaido: {
-    south: { "無印": 3, "熱": 99, "小": 99, "平": 99, "国": 99, "下": 99, "伊": 99, "沼": 99, "修": 99, "出": 99, "高": 99, "琴": 99 },
-    north: { "品": 3, "東": 1, "無印": -99, "宇": -99, "金": -99, "籠": -99, "上": 0, "古": -99, "前": -99 },
+    south: { "品川": 3, "熱": 99, "小": 99, "平": 99, "国": 99, "下": 99, "伊": 99, "沼": 99, "修": 99, "出": 99, "高": 99, "琴": 99 },
+    north: { "品": 3, "東": 1, "宇": -99, "金": -99, "籠": -99, "上": 0, "古": -99, "前": -99 },
   },
   // Keikyu only overlaps our shared-station set at shinagawa(3)/kawasaki(4)/
   // yokohama(5), so only destinations that fall short of one of those need an
@@ -240,6 +243,13 @@ function extractAllStopTimes(html) {
   return times;
 }
 
+// A negative time difference normally means the trip crosses midnight, but no
+// real trip between our stations takes anywhere near this long — anything
+// beyond it is a misread stop time (seen on a Tokyo 05時 sample, where -125
+// min wrapped to ~22h), so drop it and let nearestOffset fall back to an
+// adjacent hour instead.
+const MAX_PLAUSIBLE_OFFSET = 120;
+
 // Fetches one representative train per hour bucket and records how many
 // minutes later it reaches every other shared station it stops at. Travel
 // time isn't constant across the day (rush hour dwell adds a couple of
@@ -264,6 +274,7 @@ async function calibrateOffsets(fromStation, weekdayTrains, prefix) {
       if (times[label]) {
         let diff = toMin(times[label]) - fromMin;
         if (diff < 0) diff += 24 * 60;
+        if (diff > MAX_PLAUSIBLE_OFFSET) continue;
         offsets[stKey] = diff;
       }
     }
@@ -290,8 +301,11 @@ function nearestOffset(offsetsByHour, hour, target) {
   return best;
 }
 
-function isReachable(line, dir, dest, toIdx) {
-  const reach = DEST_REACH[line][dir][dest];
+// "無印" resolves to a different destination per station page — e.g. on the
+// Tokaido south pages it's 品川 at Ueno/Tokyo/Shimbashi but 熱海 at
+// Shinagawa/Kawasaki — so look it up by its legend label, not the code.
+function isReachable(line, dir, dest, destLabel, toIdx) {
+  const reach = DEST_REACH[line][dir][dest === "無印" ? destLabel : dest];
   if (reach === undefined) return true; // unknown code: don't silently drop, allow it through
   return dir === "south" ? toIdx <= reach : toIdx >= reach;
 }
@@ -321,13 +335,14 @@ async function buildStationLineDirection(station, line, dir, prefix) {
   const buildTrains = (trains) => {
     const out = trains.map((t) => {
       const depMinTotal = t.hour * 60 + t.minute;
+      const destLabel = resolveDestLabel(destLabels, t.dest, t.visibleDest);
       const arrivals = {};
       for (const toStation of STATIONS) {
         if (toStation === station) continue;
         const toIdx = STATIONS.indexOf(toStation);
         if (dir === "south" && toIdx <= fromIdx) continue;
         if (dir === "north" && toIdx >= fromIdx) continue;
-        if (!isReachable(line, dir, t.dest, toIdx)) continue;
+        if (!isReachable(line, dir, t.dest, destLabel, toIdx)) continue;
         const offset = nearestOffset(offsetsByHour, t.hour, toStation);
         if (offset == null) continue;
         arrivals[toStation] = depMinTotal + offset;
@@ -335,7 +350,7 @@ async function buildStationLineDirection(station, line, dir, prefix) {
       return {
         dep: `${pad2(t.hour % 24)}:${pad2(t.minute)}`,
         depMinTotal,
-        destLabel: resolveDestLabel(destLabels, t.dest, t.visibleDest),
+        destLabel,
         arrivals,
       };
     });
@@ -419,6 +434,7 @@ async function calibrateKeikyuOffsetsBySpecies(fromStation, weekdayTrains) {
       if (times[label]) {
         let diff = toMin(times[label]) - fromMin;
         if (diff < 0) diff += 24 * 60;
+        if (diff > MAX_PLAUSIBLE_OFFSET) continue;
         offsets[stKey] = diff;
       }
     }
@@ -460,7 +476,7 @@ async function buildKeikyuStationDirection(station, dir) {
         const toIdx = STATIONS.indexOf(toStation);
         if (dir === "south" && toIdx <= fromIdx) continue;
         if (dir === "north" && toIdx >= fromIdx) continue;
-        if (!isReachable("keikyu", dir, t.dest, toIdx)) continue;
+        if (!isReachable("keikyu", dir, t.dest, t.dest, toIdx)) continue;
         const offset = (offsetsBySpecies[t.trType] || {})[toStation];
         if (offset == null) continue;
         arrivals[toStation] = depMinTotal + offset;
