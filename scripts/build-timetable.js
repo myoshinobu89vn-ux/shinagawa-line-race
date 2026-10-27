@@ -243,6 +243,13 @@ function extractAllStopTimes(html) {
   return times;
 }
 
+// A negative time difference normally means the trip crosses midnight, but no
+// real trip between our stations takes anywhere near this long — anything
+// beyond it is a misread stop time (seen on a Tokyo 05時 sample, where -125
+// min wrapped to ~22h), so drop it and let nearestOffset fall back to an
+// adjacent hour instead.
+const MAX_PLAUSIBLE_OFFSET = 120;
+
 // Fetches one representative train per hour bucket and records how many
 // minutes later it reaches every other shared station it stops at. Travel
 // time isn't constant across the day (rush hour dwell adds a couple of
@@ -267,6 +274,7 @@ async function calibrateOffsets(fromStation, weekdayTrains, prefix) {
       if (times[label]) {
         let diff = toMin(times[label]) - fromMin;
         if (diff < 0) diff += 24 * 60;
+        if (diff > MAX_PLAUSIBLE_OFFSET) continue;
         offsets[stKey] = diff;
       }
     }
@@ -426,6 +434,7 @@ async function calibrateKeikyuOffsetsBySpecies(fromStation, weekdayTrains) {
       if (times[label]) {
         let diff = toMin(times[label]) - fromMin;
         if (diff < 0) diff += 24 * 60;
+        if (diff > MAX_PLAUSIBLE_OFFSET) continue;
         offsets[stKey] = diff;
       }
     }

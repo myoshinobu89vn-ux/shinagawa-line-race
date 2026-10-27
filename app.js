@@ -45,16 +45,66 @@ function nowInfo() {
   return {
     date: d,
     totalSeconds: d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds(),
-    dayOfWeek: d.getDay(), // 0=Sun..6=Sat
   };
 }
 
-function resolveDayType(mode, dayOfWeek) {
+function dateKey(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function nthMonday(year, month, n) {
+  const firstDow = new Date(year, month - 1, 1).getDay();
+  return 1 + ((8 - firstDow) % 7) + (n - 1) * 7;
+}
+
+// Holidays fixed by date or rule under 国民の祝日に関する法律 (before 振替休日
+// / 国民の休日, which isJapaneseHoliday layers on top). Equinox formulas are
+// the standard approximation, valid 1980-2099.
+function isBaseHoliday(d) {
+  const y = d.getFullYear();
+  const md = `${d.getMonth() + 1}/${d.getDate()}`;
+  const fixed = ["1/1", "2/11", "2/23", "4/29", "5/3", "5/4", "5/5", "8/11", "11/3", "11/23"];
+  if (fixed.includes(md)) return true;
+  const shift = Math.floor((y - 1980) / 4);
+  const vernal = Math.floor(20.8431 + 0.242194 * (y - 1980)) - shift;
+  const autumnal = Math.floor(23.2488 + 0.242194 * (y - 1980)) - shift;
+  return [
+    `1/${nthMonday(y, 1, 2)}`, // 成人の日
+    `3/${vernal}`, // 春分の日
+    `7/${nthMonday(y, 7, 3)}`, // 海の日
+    `9/${nthMonday(y, 9, 3)}`, // 敬老の日
+    `9/${autumnal}`, // 秋分の日
+    `10/${nthMonday(y, 10, 2)}`, // スポーツの日
+  ].includes(md);
+}
+
+function addDays(d, n) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+function isJapaneseHoliday(d) {
+  if (isBaseHoliday(d)) return true;
+  // 振替休日: the first non-holiday after a holiday that fell on a Sunday.
+  for (let k = 1; isBaseHoliday(addDays(d, -k)); k++) {
+    if (addDays(d, -k).getDay() === 0) return true;
+  }
+  // 国民の休日: a day sandwiched between two holidays.
+  return isBaseHoliday(addDays(d, -1)) && isBaseHoliday(addDays(d, 1));
+}
+
+// JR (and Keikyu) also run the 土休日 timetable over the New Year break.
+function isYearEndBreak(d) {
+  const m = d.getMonth() + 1;
+  const day = d.getDate();
+  return (m === 12 && day >= 30) || (m === 1 && day <= 3);
+}
+
+function resolveDayType(mode, date) {
   if (mode === "weekday") return "weekday";
   if (mode === "weekend") return "weekend";
-  // auto: JS getDay 0=Sun, 6=Sat -> weekend; note this does not account for
-  // Japanese public holidays, which also run weekend timetables.
-  return dayOfWeek === 0 || dayOfWeek === 6 ? "weekend" : "weekday";
+  const dow = date.getDay(); // 0=Sun, 6=Sat
+  const weekend = dow === 0 || dow === 6 || isJapaneseHoliday(date) || isYearEndBreak(date);
+  return weekend ? "weekend" : "weekday";
 }
 
 function currentFromTo() {
@@ -66,9 +116,10 @@ function direction(from, to) {
 }
 
 // Which of LINES actually run between the current from/to (Keikyu only
-// covers the shinagawa/kawasaki/yokohama overlap, so it drops out otherwise).
+// covers the shinagawa/kawasaki/yokohama overlap, and the Yokosuka Line
+// doesn't stop at kawasaki, so those drop out for pairs they don't serve).
 function activeLines(from, to, dir) {
-  return LINES.filter((line) => dataset.lines[line.key]?.[dir]?.[from]);
+  return LINES.filter((line) => lineReachesStation(line.key, dir, from, to));
 }
 
 // Does this line have at least one actual train from->to (not just a data
@@ -123,8 +174,8 @@ function render() {
   const dir = direction(from, to);
   const lines = activeLines(from, to, dir);
 
-  const mode = document.querySelector(".daytype-toggle button.active").dataset.mode;
-  const dayType = resolveDayType(mode, now.dayOfWeek);
+  const mode = currentDaytypeMode();
+  const dayType = resolveDayType(mode, now.date);
 
   const bufferMin = parseInt(el("bufferInput").value, 10) || 0;
   const earliest = now.totalSeconds + bufferMin * 60;
@@ -133,7 +184,7 @@ function render() {
   let results = lines.map((line) => {
     const list = (dataset.lines[line.key][dir][from] || {})[dayType] || [];
     const next = findNextTrains(list, to, earliest, 4);
-    return { line, next };
+    return { line, next, noData: list.length === 0 };
   });
 
   // Fastest-first, left to right; lines with no more trains today sink to the end.
@@ -145,7 +196,7 @@ function render() {
   });
 
   renderCards(results.map((r) => r.line));
-  for (const { line, next } of results) renderLine(line.key, to, next);
+  for (const { line, next, noData } of results) renderLine(line.key, to, next, noData);
 
   const banner = el("resultBanner");
   for (const { line } of results) el(`card-${line.key}`).classList.remove("winner");
@@ -218,7 +269,9 @@ function renderCards(lines) {
     .join("");
 }
 
-function renderLine(lineKey, to, nextTrains) {
+// noData: this day type's list is empty altogether (e.g. a scrape that came
+// back with no trains), which shouldn't read as "service has ended".
+function renderLine(lineKey, to, nextTrains, noData) {
   const depEl = el(`${lineKey}Dep`);
   const arrEl = el(`${lineKey}Arr`);
   const destEl = el(`${lineKey}Dest`);
@@ -229,7 +282,7 @@ function renderLine(lineKey, to, nextTrains) {
     depEl.textContent = "--:--";
     arrEl.textContent = "--:--";
     destEl.textContent = "";
-    subEl.textContent = "本日の運行終了";
+    subEl.textContent = noData ? "時刻表データなし" : "本日の運行終了";
     upcomingEl.innerHTML = "";
     return;
   }
@@ -467,15 +520,41 @@ function swapStations() {
   render();
 }
 
+// A manual 平日/土休日 pick is stored with the date it was made and only
+// applies for that day — otherwise a one-off 土休日 override (or an old
+// plain-string value from before this) would silently stick to every
+// following weekday. Anything stale falls back to 自動.
+function savedDaytypeMode() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_DAYTYPE));
+    if (saved && saved.date === dateKey(new Date())) return saved.mode;
+  } catch (e) {
+    // unparseable legacy value: treat as stale
+  }
+  return "auto";
+}
+
+function markDaytypeButton(mode) {
+  el("daytypeToggle").querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === mode);
+  });
+}
+
+// Re-checked on every render so an app left open past midnight drops a
+// previous day's override too.
+function currentDaytypeMode() {
+  const mode = savedDaytypeMode();
+  markDaytypeButton(mode);
+  return mode;
+}
+
 function setupDaytypeToggle() {
-  const container = el("daytypeToggle");
-  const saved = localStorage.getItem(STORAGE_KEY_DAYTYPE) || "auto";
-  container.querySelectorAll("button").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.mode === saved);
+  markDaytypeButton(savedDaytypeMode());
+  el("daytypeToggle").querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      container.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      localStorage.setItem(STORAGE_KEY_DAYTYPE, btn.dataset.mode);
+      const mode = btn.dataset.mode;
+      localStorage.setItem(STORAGE_KEY_DAYTYPE, JSON.stringify({ mode, date: dateKey(new Date()) }));
+      markDaytypeButton(mode);
       render();
     });
   });
